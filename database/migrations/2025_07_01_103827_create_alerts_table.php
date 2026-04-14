@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('alerts', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('item_id')->constrained('items');
+            $table->unsignedBigInteger('item_id');
             $table->enum('alert_type', ['min', 'max']);
             $table->text('message');
             $table->timestamps();

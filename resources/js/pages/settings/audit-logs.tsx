@@ -185,7 +185,6 @@ export default function AuditLogs() {
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="pl-10 h-9"
-                                size="sm"
                             />
                         </div>
                         <Button

@@ -50,8 +50,8 @@ export default function Sidebar({ className, navLinks, user }: SidebarProps) {
                         <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white"></div>
                     </div>
                     <div>
-                        <div className="text-xl font-bold tracking-wide">IT Support</div>
-                        <div className="text-xs text-blue-100 opacity-90">System</div>
+                        <div className="text-xl font-bold tracking-wide">Inventory</div>
+                        <div className="text-xs text-blue-100 opacity-90">Management System</div>
                     </div>
                 </div>
             </div>
@@ -118,7 +118,7 @@ export default function Sidebar({ className, navLinks, user }: SidebarProps) {
                                 <div className="text-xs text-blue-200 truncate flex-1 mr-1">{user.email}</div>
                                 <div className={`px-1.5 py-0.5 rounded text-xs font-medium flex-shrink-0 ${
                                     user.role?.name === 'Admin' ? 'bg-yellow-400/20 text-yellow-300' :
-                                    user.role?.name === 'IT Agent' ? 'bg-green-400/20 text-green-300' :
+                                    user.role?.name === 'Inventory Manager' ? 'bg-green-400/20 text-green-300' :
                                     'bg-gray-400/20 text-gray-300'
                                 }`}>
                                     {user.role?.name || 'Staff'}

@@ -32,18 +32,7 @@ class AuthenticatedSessionController extends Controller
         $request->authenticate();
         $request->session()->regenerate();
 
-        $role = auth()->user()->role->name ?? null;
-
-        if ($role === 'Admin') {
-            return redirect()->route('dashboard'); // or 'admin.dashboard' if you have a separate route
-        } elseif ($role === 'IT Agent') {
-            return redirect()->route('dashboard'); // or 'itagent.dashboard'
-        } elseif ($role === 'Staff') {
-            return redirect()->route('dashboard'); // or 'staff.dashboard'
-        } else {
-            // fallback if role is missing
-            return redirect()->route('dashboard');
-        }
+        return redirect()->route('dashboard');
     }
 
     /**

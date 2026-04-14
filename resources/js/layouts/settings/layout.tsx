@@ -69,15 +69,15 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     // Get current page info
     const currentPageInfo = filteredNavItems.find(item => item.href === currentPath);
 
-    const getColorClasses = (color: string, isActive: boolean) => {
-        const colors = {
+    const getColorClasses = (color: NavItem['color'], isActive: boolean) => {
+        const colors: Record<NonNullable<NavItem['color']>, string> = {
             emerald: isActive ? 'bg-emerald-500 text-white' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200',
             red: isActive ? 'bg-red-500 text-white' : 'bg-red-100 text-red-700 hover:bg-red-200',
             purple: isActive ? 'bg-purple-500 text-white' : 'bg-purple-100 text-purple-700 hover:bg-purple-200',
             orange: isActive ? 'bg-orange-500 text-white' : 'bg-orange-100 text-orange-700 hover:bg-orange-200',
             blue: isActive ? 'bg-blue-500 text-white' : 'bg-blue-100 text-blue-700 hover:bg-blue-200',
         };
-        return colors[color] || colors.blue;
+        return color ? colors[color] : colors.blue;
     };
 
     return (

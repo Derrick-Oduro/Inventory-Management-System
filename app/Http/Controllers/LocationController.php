@@ -184,7 +184,7 @@ class LocationController extends Controller
     }
 
     /**
-     * Get all locations with requisition counts.
+     * Get all locations with inventory stats.
      * Used for admin dashboard and reporting.
      * Only accessible to administrators.
      *
@@ -197,18 +197,8 @@ class LocationController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        $locations = Location::withCount([
-            'requisitions',
-            'requisitions as pending_count' => function ($query) {
-                $query->where('status', 'pending');
-            },
-            'requisitions as approved_count' => function ($query) {
-                $query->where('status', 'approved');
-            },
-            'requisitions as declined_count' => function ($query) {
-                $query->where('status', 'declined');
-            }
-        ])
+        $locations = Location::withCount('itemStocks')
+            ->withSum('itemStocks as total_quantity', 'quantity')
             ->orderBy('name')
             ->get();
 

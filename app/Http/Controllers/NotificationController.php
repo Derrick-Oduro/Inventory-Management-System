@@ -3,11 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Notifications\TicketNotification;
-use App\Notifications\InventoryNotification;
-use App\Notifications\RequisitionNotification;
-use App\Notifications\TestNotification;
-use App\Models\User;
+use App\Notifications\InventoryEventNotification;
 use Illuminate\Support\Facades\Log;
 
 class NotificationController extends Controller
@@ -72,11 +68,12 @@ class NotificationController extends Controller
 
             Log::info('Creating test notification for user: ' . $user->id);
 
-            $user->notify(new TestNotification([
-                'title' => 'Test Notification',
+            $user->notify(new InventoryEventNotification([
+                'title' => 'IMS Notification Test',
                 'message' => 'This is a test notification created at ' . now()->format('Y-m-d H:i:s'),
-                'icon' => 'test'
-            ]));
+                'icon' => 'inventory',
+                'action_url' => '/dashboard',
+            ], ['database']));
 
             Log::info('Test notification created successfully');
 
@@ -84,54 +81,6 @@ class NotificationController extends Controller
         } catch (\Exception $e) {
             Log::error('Error creating test notification: ' . $e->getMessage());
             return response()->json(['error' => 'Failed to create test notification'], 500);
-        }
-    }
-
-    // Send ticket notifications
-    public function sendTicketNotification($ticketId, $type, $message, $recipientIds = [])
-    {
-        $recipients = User::whereIn('id', $recipientIds)->get();
-
-        foreach ($recipients as $recipient) {
-            $recipient->notify(new TicketNotification([
-                'title' => 'Ticket Update',
-                'message' => $message,
-                'ticket_id' => $ticketId,
-                'action_url' => "/tickets",
-                'icon' => 'ticket'
-            ]));
-        }
-    }
-
-    // Send inventory notifications
-    public function sendInventoryNotification($itemId, $type, $message, $recipientIds = [])
-    {
-        $recipients = User::whereIn('id', $recipientIds)->get();
-
-        foreach ($recipients as $recipient) {
-            $recipient->notify(new InventoryNotification([
-                'title' => 'Inventory Alert',
-                'message' => $message,
-                'item_id' => $itemId,
-                'action_url' => "/inventory",
-                'icon' => 'inventory'
-            ]));
-        }
-    }
-
-    // Send requisition notifications
-    public function sendRequisitionNotification($requisitionId, $type, $message, $recipientIds = [])
-    {
-        $recipients = User::whereIn('id', $recipientIds)->get();
-
-        foreach ($recipients as $recipient) {
-            $recipient->notify(new RequisitionNotification([
-                'title' => 'Requisition Update',
-                'message' => $message,
-                'requisition_id' => $requisitionId,
-                'action_url' => "/requisitions",
-                'icon' => 'requisition'
-            ]));
         }
     }
 }

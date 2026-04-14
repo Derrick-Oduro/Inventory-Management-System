@@ -114,7 +114,7 @@ class UserController extends Controller
     {
         try {
             $query = User::whereHas('role', function($q) {
-                $q->where('name', 'IT Agent');
+                $q->where('name', 'Inventory Manager');
             });
 
             // Filter only active users if requested
@@ -125,7 +125,7 @@ class UserController extends Controller
             $agents = $query->with('role')->get();
             return response()->json($agents);
         } catch (\Exception $e) {
-            return response()->json(['error' => 'Failed to fetch IT agents'], 500);
+            return response()->json(['error' => 'Failed to fetch inventory managers'], 500);
         }
     }
 }

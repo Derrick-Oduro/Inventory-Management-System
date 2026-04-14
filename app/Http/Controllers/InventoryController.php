@@ -2,377 +2,402 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
 use App\Models\InventoryItem;
 use App\Models\ItemCategory;
-use App\Models\UnitOfMeasure;
-use App\Models\InventoryTransaction;
+use App\Models\ItemStock;
 use App\Models\Location;
-use App\Models\User;
-use App\Models\AuditLog;
+use App\Models\StockMovement;
+use App\Models\UnitOfMeasure;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
-use App\Notifications\InventoryNotification;
 
 class InventoryController extends Controller
 {
-    /**
-     * Display inventory page
-     */
     public function index()
     {
         $user = Auth::user();
         $role = $user->role->name ?? null;
 
-        // Initial data for inventory page
-        $categories = ItemCategory::orderBy('name')->get();
-        $units = UnitOfMeasure::orderBy('name')->get();
-
         return Inertia::render('inventory', [
-            'categories' => $categories,
-            'units' => $units,
-            'canManageInventory' => $role === 'Admin'
+            'categories' => ItemCategory::orderBy('name')->get(),
+            'units' => UnitOfMeasure::orderBy('name')->get(),
+            'canManageInventory' => in_array($role, ['Admin', 'Inventory Manager'], true),
         ]);
     }
 
-    /**
-     * Get all inventory items with related data
-     */
-    public function getItems(Request $request)
+    public function getItems(Request $request): JsonResponse
     {
-        try {
-            // Query for inventory items
-            $query = InventoryItem::with(['category', 'unitOfMeasure', 'creator'])
-                ->orderBy('name');
+        $query = InventoryItem::query()
+            ->with([
+                'category:id,name',
+                'unitOfMeasure:id,name,abbreviation',
+                'creator:id,name',
+                'location:id,name',
+                'suppliers:id,company_name',
+            ])
+            ->withSum('stocks as stock_total', 'quantity')
+            ->orderBy('name');
 
-            // Filter by category if provided
-            if ($request->has('category_id') && $request->category_id) {
-                $query->where('category_id', $request->category_id);
-            }
-
-            // Filter by active status if provided
-            if ($request->has('active')) {
-                $query->where('is_active', $request->boolean('active'));
-            } else {
-                // Default to active items only
-                $query->where('is_active', true);
-            }
-
-            // Search functionality
-            if ($request->has('search') && $request->search) {
-                $search = $request->search;
-                $query->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                        ->orWhere('sku', 'like', "%{$search}%")
-                        ->orWhere('description', 'like', "%{$search}%");
-                });
-            }
-
-            $items = $query->get();
-
-            // Get categories and units for dropdowns
-            $categories = ItemCategory::orderBy('name')->get();
-            $units = UnitOfMeasure::orderBy('name')->get();
-            $locations = Location::where('is_active', true)->orderBy('name')->get();
-
-            // Return structured response
-            return response()->json([
-                'items' => $items,
-                'categories' => $categories,
-                'units' => $units,
-                'locations' => $locations,
-            ]);
-        } catch (\Exception $e) {
-            \Log::error('Error fetching inventory data: ' . $e->getMessage());
-            return response()->json([
-                'items' => [],
-                'categories' => [],
-                'units' => []
-            ], 500);
+        if ($request->filled('category_id')) {
+            $query->where('category_id', $request->integer('category_id'));
         }
+
+        if ($request->has('active')) {
+            $query->where('is_active', $request->boolean('active'));
+        } else {
+            $query->where('is_active', true);
+        }
+
+        if ($request->filled('search')) {
+            $search = trim((string) $request->query('search'));
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('sku', 'like', "%{$search}%")
+                    ->orWhereHas('category', function ($categoryQuery) use ($search) {
+                        $categoryQuery->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        $items = $query->get()->each(function (InventoryItem $item) {
+            $currentQuantity = (float) ($item->stock_total ?? $item->quantity ?? 0);
+            $item->setAttribute('quantity', $currentQuantity);
+            $item->setAttribute('current_quantity', $currentQuantity);
+            $item->setAttribute('location', $item->location?->name);
+        });
+
+        return response()->json([
+            'items' => $items,
+            'categories' => ItemCategory::orderBy('name')->get(),
+            'units' => UnitOfMeasure::orderBy('name')->get(),
+            'locations' => Location::where('is_active', true)->orderBy('name')->get(),
+        ]);
     }
 
-    /**
-     * Store a new inventory item (Admin only)
-     */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
-        // Check if user is admin
-        if (Auth::user()->role->name !== 'Admin') {
+        if (!$this->isManagerOrAdmin()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $request->validate([
+        $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'sku' => 'required|string|max:50|unique:inventory_items',
+            'sku' => 'required|string|max:50|unique:inventory_items,sku',
             'description' => 'nullable|string',
-            'category_id' => 'nullable|exists:item_categories,id',
-            'uom_id' => 'nullable|exists:units_of_measure,id',
-            'quantity' => 'required|numeric|min:0',
+            'category_id' => 'required|exists:item_categories,id',
+            'uom_id' => 'required|exists:units_of_measure,id',
             'reorder_level' => 'required|numeric|min:0',
+            'reorder_quantity' => 'required|numeric|min:0',
+            'cost_price' => 'required|numeric|min:0',
+            'selling_price' => 'required|numeric|min:0',
             'unit_price' => 'nullable|numeric|min:0',
+            'is_active' => 'nullable|boolean',
             'location_id' => 'nullable|exists:locations,id',
-            'image' => 'nullable|image|max:2048',
+            'quantity' => 'nullable|numeric|min:0',
+            'initial_quantity' => 'nullable|numeric|min:0',
+            'supplier_ids' => 'nullable|array',
+            'supplier_ids.*' => 'exists:suppliers,id',
+            'image' => 'nullable|image|max:4096',
         ]);
 
-        // Handle image upload if provided
+        $initialQuantity = (float) ($validated['initial_quantity'] ?? $validated['quantity'] ?? 0);
+        $basePrice = (float) $validated['cost_price'];
+        $sellingPrice = (float) $validated['selling_price'];
+        $reorderQuantity = (float) $validated['reorder_quantity'];
+
+        if ($initialQuantity > 0 && empty($validated['location_id'])) {
+            return response()->json([
+                'message' => 'Location is required when setting an initial quantity.',
+                'errors' => [
+                    'location_id' => ['Location is required when initial quantity is greater than zero.'],
+                ],
+            ], 422);
+        }
+
         $imagePath = null;
         if ($request->hasFile('image')) {
             $imagePath = $request->file('image')->store('inventory', 'public');
         }
 
-        $userId = Auth::id();
-
-        $item = InventoryItem::create([
-            'name' => $request->name,
-            'sku' => $request->sku,
-            'description' => $request->description,
-            'category_id' => $request->category_id,
-            'uom_id' => $request->uom_id,
-            'quantity' => $request->quantity,
-            'reorder_level' => $request->reorder_level,
-            'unit_price' => $request->unit_price,
-            'is_active' => true,
-            'location_id' => $request->location_id,
-            'image_path' => $imagePath,
-            'created_by' => $userId,
-            'updated_by' => $userId,
-        ]);
-
-        // Create initial inventory transaction
-        if ($request->quantity > 0) {
-            InventoryTransaction::create([
-                'item_id' => $item->id,
-                'type' => 'add',
-                'quantity' => $request->quantity,
-                'quantity_before' => 0,
-                'quantity_after' => $request->quantity,
-                'notes' => 'Initial inventory',
-                'user_id' => $userId,
-            ]);
-        }
-
-        // Send notification to all admins about new item creation
-        try {
-            $admins = User::whereHas('role', function($query) {
-                $query->where('name', 'Admin');
-            })->where('id', '!=', $userId)->get();
-
-            \Log::info('Found admins for notification', [
-                'count' => $admins->count(),
-                'admin_ids' => $admins->pluck('id')->toArray()
+        $item = DB::transaction(function () use ($validated, $initialQuantity, $imagePath, $reorderQuantity, $basePrice, $sellingPrice) {
+            $item = InventoryItem::create([
+                'name' => $validated['name'],
+                'sku' => $validated['sku'],
+                'description' => $validated['description'] ?? null,
+                'category_id' => $validated['category_id'],
+                'uom_id' => $validated['uom_id'],
+                'reorder_level' => $validated['reorder_level'],
+                'reorder_quantity' => $reorderQuantity,
+                'cost_price' => $basePrice,
+                'selling_price' => $sellingPrice,
+                'unit_price' => $basePrice,
+                'quantity' => 0,
+                'is_active' => $validated['is_active'] ?? true,
+                'location_id' => $validated['location_id'] ?? null,
+                'image_path' => $imagePath,
+                'created_by' => Auth::id(),
+                'updated_by' => Auth::id(),
             ]);
 
-            foreach ($admins as $admin) {
-                $admin->notify(new InventoryNotification([
-                    'title' => 'New Item Added',
-                    'message' => "New inventory item '{$item->name}' has been added to the system",
-                    'item_id' => $item->id,
-                    'action_url' => '/inventory',
-                    'icon' => 'inventory'
-                ]));
-
-                \Log::info('Notification sent to admin: ' . $admin->id);
+            if (!empty($validated['supplier_ids'])) {
+                $syncPayload = [];
+                foreach ($validated['supplier_ids'] as $supplierId) {
+                    $syncPayload[$supplierId] = [
+                        'is_preferred' => false,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                }
+                $item->suppliers()->sync($syncPayload);
             }
-        } catch (\Exception $e) {
-            \Log::error('Error sending notifications: ' . $e->getMessage());
-        }
+
+            if ($initialQuantity > 0 && !empty($validated['location_id'])) {
+                ItemStock::query()->updateOrCreate(
+                    [
+                        'item_id' => $item->id,
+                        'location_id' => $validated['location_id'],
+                    ],
+                    [
+                        'quantity' => $initialQuantity,
+                    ]
+                );
+
+                StockMovement::create([
+                    'item_id' => $item->id,
+                    'movement_type' => 'stock_in',
+                    'quantity' => $initialQuantity,
+                    'to_location_id' => $validated['location_id'],
+                    'status' => 'completed',
+                    'notes' => 'Initial stock from product creation',
+                    'performed_by' => Auth::id(),
+                ]);
+
+                $item->update(['quantity' => $initialQuantity]);
+            }
+
+            return $item;
+        });
 
         AuditLog::log(
-            'INVENTORY_CREATE',
-            "Created inventory item: {$item->name}",
+            'PRODUCT_CREATE',
+            "Created product: {$item->name}",
             'InventoryItem',
             $item->id,
             null,
             $item->toArray()
         );
 
-        return response()->json($item->load(['category', 'unitOfMeasure']), 201);
+        return response()->json($item->load(['category', 'unitOfMeasure', 'suppliers']), 201);
     }
 
-    /**
-     * Update an inventory item (Admin only)
-     */
-    public function update(Request $request, $id)
+    public function update(Request $request, int $id): JsonResponse
     {
-        // Check if user is admin
-        if (Auth::user()->role->name !== 'Admin') {
+        if (!$this->isManagerOrAdmin()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
         $item = InventoryItem::findOrFail($id);
 
-        $request->validate([
+        $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'sku' => 'required|string|max:50|unique:inventory_items,sku,' . $id,
+            'sku' => 'required|string|max:50|unique:inventory_items,sku,' . $item->id,
             'description' => 'nullable|string',
-            'category_id' => 'nullable|exists:item_categories,id',
-            'uom_id' => 'nullable|exists:units_of_measure,id',
+            'category_id' => 'required|exists:item_categories,id',
+            'uom_id' => 'required|exists:units_of_measure,id',
             'reorder_level' => 'required|numeric|min:0',
+            'reorder_quantity' => 'required|numeric|min:0',
+            'cost_price' => 'required|numeric|min:0',
+            'selling_price' => 'required|numeric|min:0',
             'unit_price' => 'nullable|numeric|min:0',
             'is_active' => 'required|boolean',
             'location_id' => 'nullable|exists:locations,id',
-            'image' => 'nullable|image|max:2048',
+            'supplier_ids' => 'nullable|array',
+            'supplier_ids.*' => 'exists:suppliers,id',
+            'image' => 'nullable|image|max:4096',
         ]);
 
-        // Handle image upload if provided
-        if ($request->hasFile('image')) {
-            // Delete old image if exists
-            if ($item->image_path && Storage::disk('public')->exists($item->image_path)) {
-                Storage::disk('public')->delete($item->image_path);
-            }
-
-            $imagePath = $request->file('image')->store('inventory', 'public');
-            $item->image_path = $imagePath;
-        }
+        $basePrice = (float) $validated['cost_price'];
+        $sellingPrice = (float) $validated['selling_price'];
+        $reorderQuantity = (float) $validated['reorder_quantity'];
 
         $oldValues = $item->getOriginal();
 
-        $item->name = $request->name;
-        $item->sku = $request->sku;
-        $item->description = $request->description;
-        $item->category_id = $request->category_id;
-        $item->uom_id = $request->uom_id;
-        $item->reorder_level = $request->reorder_level;
-        $item->unit_price = $request->unit_price;
-        $item->is_active = $request->is_active;
-        $item->location_id = $request->location_id;
-        $item->updated_by = Auth::id();
+        if ($request->hasFile('image')) {
+            if ($item->image_path && Storage::disk('public')->exists($item->image_path)) {
+                Storage::disk('public')->delete($item->image_path);
+            }
+            $item->image_path = $request->file('image')->store('inventory', 'public');
+        }
+
+        $item->fill([
+            'name' => $validated['name'],
+            'sku' => $validated['sku'],
+            'description' => $validated['description'] ?? null,
+            'category_id' => $validated['category_id'],
+            'uom_id' => $validated['uom_id'],
+            'reorder_level' => $validated['reorder_level'],
+            'reorder_quantity' => $reorderQuantity,
+            'cost_price' => $basePrice,
+            'selling_price' => $sellingPrice,
+            'unit_price' => $basePrice,
+            'is_active' => $validated['is_active'],
+            'location_id' => $validated['location_id'] ?? null,
+            'updated_by' => Auth::id(),
+        ]);
 
         $item->save();
 
+        if (array_key_exists('supplier_ids', $validated)) {
+            $syncPayload = [];
+            foreach (($validated['supplier_ids'] ?? []) as $supplierId) {
+                $syncPayload[$supplierId] = [
+                    'is_preferred' => false,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+            $item->suppliers()->sync($syncPayload);
+        }
+
         AuditLog::log(
-            'INVENTORY_UPDATE',
-            "Updated inventory item: {$item->name}",
+            'PRODUCT_UPDATE',
+            "Updated product: {$item->name}",
             'InventoryItem',
             $item->id,
             $oldValues,
             $item->getChanges()
         );
 
-        return response()->json($item->load(['category', 'unitOfMeasure']));
+        return response()->json($item->load(['category', 'unitOfMeasure', 'suppliers']));
     }
 
-    /**
-     * Adjust inventory quantity (Admin only)
-     */
-    public function adjustQuantity(Request $request, $id)
+    public function adjustQuantity(Request $request, int $id): JsonResponse
     {
-        // Check if user is admin
-        if (Auth::user()->role->name !== 'Admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
         $item = InventoryItem::findOrFail($id);
 
-        $request->validate([
-            'adjustment_type' => 'required|in:add,remove,adjust',
-            'quantity' => 'required|numeric|min:0.01',
-            'notes' => 'nullable|string',
-        ]);
-
-        $quantityBefore = $item->quantity;
-        $adjustmentType = $request->adjustment_type;
-        $adjustmentQty = $request->quantity;
-
-        switch ($adjustmentType) {
-            case 'add':
-                $item->quantity += $adjustmentQty;
-                break;
-            case 'remove':
-                if ($item->quantity < $adjustmentQty) {
-                    return response()->json([
-                        'message' => 'Insufficient quantity available',
-                    ], 422);
-                }
-                $item->quantity -= $adjustmentQty;
-                break;
-            case 'adjust':
-                $item->quantity = $adjustmentQty;
-                break;
+        if (!$item->is_active) {
+            return response()->json(['message' => 'Cannot adjust stock for inactive products.'], 422);
         }
 
-        $item->updated_by = Auth::id();
-        $item->save();
-
-        // Record the transaction
-        InventoryTransaction::create([
-            'item_id' => $item->id,
-            'type' => $adjustmentType,
-            'quantity' => $adjustmentQty,
-            'quantity_before' => $quantityBefore,
-            'quantity_after' => $item->quantity,
-            'notes' => $request->notes,
-            'user_id' => Auth::id(),
+        $validated = $request->validate([
+            'quantity' => 'required|numeric|min:0.01',
+            'location_id' => 'nullable|exists:locations,id',
+            'adjustment_mode' => 'nullable|in:increase,decrease,set',
+            'adjustment_type' => 'nullable|in:add,remove,adjust',
+            'notes' => 'nullable|string|max:1000',
         ]);
+
+        $mode = $validated['adjustment_mode'] ?? match ($validated['adjustment_type'] ?? 'adjust') {
+            'add' => 'increase',
+            'remove' => 'decrease',
+            default => 'set',
+        };
+
+        $locationId = $validated['location_id']
+            ?? $item->location_id
+            ?? Location::query()->value('id');
+
+        if (!$locationId) {
+            return response()->json(['message' => 'No inventory location exists for this adjustment.'], 422);
+        }
+
+        $movement = StockMovement::create([
+            'item_id' => $item->id,
+            'movement_type' => 'adjustment',
+            'quantity' => $validated['quantity'],
+            'from_location_id' => $locationId,
+            'status' => 'pending_approval',
+            'notes' => $validated['notes'] ?? ('Pending adjustment (' . $mode . ')'),
+            'reference_type' => 'manual_adjustment',
+            'performed_by' => Auth::id(),
+        ]);
+
+        if ($this->isManagerOrAdmin()) {
+            DB::transaction(function () use ($movement, $item, $mode, $locationId, $validated) {
+                $stock = ItemStock::query()->firstOrCreate(
+                    [
+                        'item_id' => $item->id,
+                        'location_id' => $locationId,
+                    ],
+                    [
+                        'quantity' => 0,
+                    ]
+                );
+
+                $quantity = (float) $validated['quantity'];
+
+                if ($mode === 'increase') {
+                    $stock->increment('quantity', $quantity);
+                } elseif ($mode === 'decrease') {
+                    if ((float) $stock->quantity < $quantity) {
+                        abort(response()->json(['message' => 'Stock cannot go below zero.'], 422));
+                    }
+                    $stock->decrement('quantity', $quantity);
+                } else {
+                    $stock->update(['quantity' => $quantity]);
+                }
+
+                $movement->update([
+                    'status' => 'approved',
+                    'approved_by' => Auth::id(),
+                    'approved_at' => now(),
+                ]);
+
+                $item->update([
+                    'quantity' => ItemStock::query()->where('item_id', $item->id)->sum('quantity'),
+                    'location_id' => $locationId,
+                ]);
+            });
+
+            return response()->json([
+                'message' => 'Adjustment approved and applied successfully.',
+                'movement' => $movement->fresh(),
+            ]);
+        }
 
         AuditLog::log(
-            'INVENTORY_ADJUST',
-            "Adjusted inventory for {$item->name}: {$adjustmentType} {$adjustmentQty} (was {$quantityBefore}, now {$item->quantity})",
-            'InventoryItem',
-            $item->id,
-            ['quantity' => $quantityBefore],
-            ['quantity' => $item->quantity, 'adjustment_type' => $adjustmentType]
+            'PRODUCT_ADJUSTMENT_REQUEST',
+            "Created stock adjustment request for {$item->name}",
+            'StockMovement',
+            $movement->id,
+            null,
+            $movement->toArray()
         );
 
-        // Check for low stock and send notifications
-        if ($item->quantity <= $item->reorder_level) {
-            $admins = User::whereHas('role', function($query) {
-                $query->where('name', 'Admin');
-            })->get();
-
-            foreach ($admins as $admin) {
-                $admin->notify(new \App\Notifications\InventoryNotification([
-                    'title' => 'Low Stock Alert',
-                    'message' => "Item '{$item->name}' is running low. Current stock: {$item->quantity}",
-                    'item_id' => $item->id,
-                    'action_url' => '/inventory',
-                    'icon' => 'inventory'
-                ]));
-            }
-        }
-
         return response()->json([
-            'item' => $item->load(['category', 'unitOfMeasure']),
-            'message' => 'Inventory adjusted successfully',
+            'message' => 'Adjustment submitted for approval.',
+            'movement' => $movement,
         ]);
     }
 
-    /**
-     * Get inventory transaction history for an item
-     */
-    public function getItemTransactions($id)
+    public function getItemTransactions(int $id): JsonResponse
     {
-        $item = InventoryItem::findOrFail($id);
-
-        $transactions = InventoryTransaction::with('user')
+        $transactions = StockMovement::query()
+            ->with(['performedBy:id,name', 'approvedBy:id,name', 'fromLocation:id,name', 'toLocation:id,name'])
             ->where('item_id', $id)
-            ->orderBy('created_at', 'desc')
+            ->latest()
             ->get();
 
         return response()->json($transactions);
     }
 
-    /**
-     * Create a new category (Admin only)
-     */
-    public function storeCategory(Request $request)
+    public function storeCategory(Request $request): JsonResponse
     {
-        // Check if user is admin
-        if (Auth::user()->role->name !== 'Admin') {
+        if (!$this->isManagerOrAdmin()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $request->validate([
-            'name' => 'required|string|max:255|unique:item_categories',
+        $validated = $request->validate([
+            'name' => 'required|string|max:255|unique:item_categories,name',
             'description' => 'nullable|string',
         ]);
 
-        $category = ItemCategory::create([
-            'name' => $request->name,
-            'description' => $request->description,
-        ]);
+        $category = ItemCategory::create($validated);
 
         AuditLog::log(
             'CATEGORY_CREATE',
@@ -386,149 +411,214 @@ class InventoryController extends Controller
         return response()->json($category, 201);
     }
 
-    /**
-     * Create a new unit of measure (Admin only)
-     */
-    public function storeUnitOfMeasure(Request $request)
+    public function storeUnitOfMeasure(Request $request): JsonResponse
     {
-        // Check if user is admin
-        if (Auth::user()->role->name !== 'Admin') {
+        if (!$this->isManagerOrAdmin()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $request->validate([
-            'name' => 'required|string|max:255|unique:units_of_measure',
-            'abbreviation' => 'required|string|max:10|unique:units_of_measure',
+        $validated = $request->validate([
+            'name' => 'required|string|max:255|unique:units_of_measure,name',
+            'abbreviation' => 'required|string|max:10|unique:units_of_measure,abbreviation',
         ]);
 
-        $unit = UnitOfMeasure::create([
-            'name' => $request->name,
-            'abbreviation' => $request->abbreviation,
-        ]);
+        $unit = UnitOfMeasure::create($validated);
 
         return response()->json($unit, 201);
     }
 
-    /**
-     * Get all categories
-     */
-    public function getCategories()
+    public function getCategories(): JsonResponse
     {
-        try {
-            $categories = ItemCategory::orderBy('name')->get();
-            return response()->json($categories);
-        } catch (\Exception $e) {
-            return response()->json(['error' => 'Failed to fetch categories'], 500);
-        }
+        return response()->json(ItemCategory::orderBy('name')->get());
     }
 
-    /**
-     * Get all units
-     */
-    public function getUnits()
+    public function getUnits(): JsonResponse
     {
-        try {
-            $units = UnitOfMeasure::orderBy('name')->get();
-            return response()->json($units);
-        } catch (\Exception $e) {
-            return response()->json(['error' => 'Failed to fetch units'], 500);
-        }
+        return response()->json(UnitOfMeasure::orderBy('name')->get());
     }
 
-    /**
-     * Delete a category
-     */
-    public function destroyCategory($id)
+    public function destroyCategory(int $id): JsonResponse
     {
-        if (Auth::user()->role->name !== 'Admin') {
+        if (!$this->isManagerOrAdmin()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        try {
-            $category = ItemCategory::findOrFail($id);
+        $category = ItemCategory::findOrFail($id);
 
-            // Check if category is being used
-            if ($category->items()->count() > 0) {
-                return response()->json(['message' => 'Cannot delete category that is in use by inventory items'], 400);
-            }
-
-            AuditLog::log(
-                'CATEGORY_DELETE',
-                "Deleted category: {$category->name}",
-                'ItemCategory',
-                $category->id,
-                $category->toArray(),
-                null
-            );
-
-            $category->delete();
-            return response()->json(['message' => 'Category deleted successfully']);
-        } catch (\Exception $e) {
-            return response()->json(['message' => 'Error deleting category'], 500);
+        if ($category->items()->exists()) {
+            return response()->json(['message' => 'Cannot delete a category that is used by products.'], 400);
         }
+
+        $category->delete();
+
+        return response()->json(['message' => 'Category deleted successfully']);
     }
 
-    /**
-     * Delete a unit
-     */
-    public function destroyUnit($id)
+    public function destroyUnit(int $id): JsonResponse
     {
-        if (Auth::user()->role->name !== 'Admin') {
+        if (!$this->isManagerOrAdmin()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        try {
-            $unit = UnitOfMeasure::findOrFail($id);
+        $unit = UnitOfMeasure::findOrFail($id);
 
-            // Check if unit is being used
-            if ($unit->items()->count() > 0) {
-                return response()->json(['message' => 'Cannot delete unit that is in use by inventory items'], 400);
-            }
-
-            $unit->delete();
-            return response()->json(['message' => 'Unit deleted successfully']);
-        } catch (\Exception $e) {
-            return response()->json(['message' => 'Error deleting unit'], 500);
+        if ($unit->items()->exists()) {
+            return response()->json(['message' => 'Cannot delete a unit in use by products.'], 400);
         }
+
+        $unit->delete();
+
+        return response()->json(['message' => 'Unit deleted successfully']);
     }
 
-    /**
-     * Remove the specified inventory item.
-     */
-    public function destroy($id)
+    public function destroy(int $id): JsonResponse
     {
-        try {
-            $item = InventoryItem::findOrFail($id);
-
-            // Delete associated image if exists
-            if ($item->image_path) {
-                Storage::disk('public')->delete($item->image_path);
-            }
-
-            AuditLog::log(
-                'INVENTORY_DELETE',
-                "Deleted inventory item: {$item->name}",
-                'InventoryItem',
-                $item->id,
-                $item->toArray(),
-                null
-            );
-
-            // Option 1: Soft delete (if you've added softDeletes to your model)
-            // $item->delete();
-
-            // Option 2: Hard delete, but keep transaction history
-            // This allows you to still reference transactions for accounting purposes
-            // even if the item is gone
-            $item->is_active = false;
-            $item->name = "[DELETED] " . $item->name;
-            $item->save();
-            $item->delete();
-
-            return response()->json(['message' => 'Item deleted successfully']);
-        } catch (\Exception $e) {
-            \Log::error('Error deleting inventory item: ' . $e->getMessage());
-            return response()->json(['message' => 'Failed to delete item: ' . $e->getMessage()], 500);
+        if (!$this->isManagerOrAdmin()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
         }
+
+        $item = InventoryItem::findOrFail($id);
+        $item->update([
+            'is_active' => false,
+            'updated_by' => Auth::id(),
+        ]);
+
+        AuditLog::log(
+            'PRODUCT_DEACTIVATE',
+            "Deactivated product: {$item->name}",
+            'InventoryItem',
+            $item->id,
+            ['is_active' => true],
+            ['is_active' => false]
+        );
+
+        return response()->json(['message' => 'Product deactivated successfully']);
+    }
+
+    public function importCsv(Request $request): JsonResponse
+    {
+        if (!$this->isManagerOrAdmin()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $request->validate([
+            'file' => 'required|file|mimes:csv,txt|max:10240',
+        ]);
+
+        $file = $request->file('file');
+        $path = $file->getRealPath();
+
+        if (!$path) {
+            return response()->json(['message' => 'Invalid file.'], 422);
+        }
+
+        $handle = fopen($path, 'r');
+        if (!$handle) {
+            return response()->json(['message' => 'Unable to read file.'], 422);
+        }
+
+        $header = fgetcsv($handle);
+        if (!$header) {
+            fclose($handle);
+            return response()->json(['message' => 'CSV file has no header row.'], 422);
+        }
+
+        $headerMap = array_map(fn ($value) => strtolower(trim((string) $value)), $header);
+
+        $created = 0;
+        $updated = 0;
+
+        DB::transaction(function () use ($handle, $headerMap, &$created, &$updated) {
+            while (($row = fgetcsv($handle)) !== false) {
+                if (count($row) === 1 && trim((string) $row[0]) === '') {
+                    continue;
+                }
+
+                $data = [];
+                foreach ($headerMap as $index => $column) {
+                    $data[$column] = $row[$index] ?? null;
+                }
+
+                if (empty($data['name']) || empty($data['sku'])) {
+                    continue;
+                }
+
+                $categoryName = trim((string) ($data['category'] ?? 'General'));
+                if ($categoryName === '') {
+                    $categoryName = 'General';
+                }
+
+                $category = ItemCategory::firstOrCreate(
+                    ['name' => $categoryName],
+                    ['description' => null]
+                );
+
+                $unitName = trim((string) ($data['unit'] ?? 'Piece'));
+                if ($unitName === '') {
+                    $unitName = 'Piece';
+                }
+
+                $abbreviation = strtoupper(substr($unitName, 0, 10));
+                $unit = UnitOfMeasure::firstOrCreate(
+                    ['name' => $unitName],
+                    ['abbreviation' => $abbreviation]
+                );
+
+                $costPrice = (float) ($data['cost_price'] ?? 0);
+                $sellingPrice = (float) ($data['selling_price'] ?? $costPrice);
+                if ($sellingPrice < $costPrice) {
+                    $sellingPrice = $costPrice;
+                }
+
+                $payload = [
+                    'name' => trim((string) $data['name']),
+                    'description' => $data['description'] ?? null,
+                    'category_id' => $category->id,
+                    'uom_id' => $unit->id,
+                    'reorder_level' => (float) ($data['reorder_level'] ?? 0),
+                    'reorder_quantity' => (float) ($data['reorder_quantity'] ?? $data['reorder_level'] ?? 0),
+                    'cost_price' => $costPrice,
+                    'selling_price' => $sellingPrice,
+                    'unit_price' => $costPrice,
+                    'is_active' => $this->parseBoolean($data['is_active'] ?? '1'),
+                    'updated_by' => Auth::id(),
+                ];
+
+                $existing = InventoryItem::where('sku', trim((string) $data['sku']))->first();
+
+                if ($existing) {
+                    $existing->update($payload);
+                    $updated++;
+                } else {
+                    InventoryItem::create([
+                        ...$payload,
+                        'sku' => trim((string) $data['sku']),
+                        'quantity' => 0,
+                        'created_by' => Auth::id(),
+                    ]);
+                    $created++;
+                }
+            }
+        });
+
+        fclose($handle);
+
+        return response()->json([
+            'message' => 'CSV import completed successfully.',
+            'created' => $created,
+            'updated' => $updated,
+        ]);
+    }
+
+    private function parseBoolean(mixed $value): bool
+    {
+        $normalized = strtolower(trim((string) $value));
+        return in_array($normalized, ['1', 'true', 'yes', 'y'], true);
+    }
+
+    private function isManagerOrAdmin(): bool
+    {
+        $role = Auth::user()?->role?->name;
+        return in_array($role, ['Admin', 'Inventory Manager'], true);
     }
 }

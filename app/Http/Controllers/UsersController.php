@@ -139,15 +139,15 @@ class UsersController extends Controller
         }
     }
     /**
-     * Get IT agents for ticket assignment
+     * Get inventory managers
      */
     public function getAgents(Request $request)
     {
         try {
-            // Get users with IT Agent role (role_id = 2)
+            // Get users with Inventory Manager role (role_id = 2)
             $query = User::with('role')
                 ->whereHas('role', function ($query) {
-                    $query->where('name', 'IT Agent');
+                    $query->where('name', 'Inventory Manager');
                 })
                 ->orWhere('role_id', 2);
 
@@ -165,7 +165,7 @@ class UsersController extends Controller
 
             // Return a helpful error response
             return response()->json([
-                'message' => 'Failed to retrieve IT Agents',
+                'message' => 'Failed to retrieve inventory managers',
                 'error' => $e->getMessage()
             ], 500);
         }

@@ -28,10 +28,13 @@ type InventoryItem = {
     description: string | null;
     category_id: number | null;
     uom_id: number | null;
-    location_id: number | null;
-    quantity: number;
-    reorder_level: number;
-    unit_price: number | null;
+    location_id?: number | null;
+    quantity: number | string;
+    reorder_level: number | string;
+    reorder_quantity?: number | string | null;
+    cost_price?: number | string | null;
+    selling_price?: number | string | null;
+    unit_price?: number | string | null;
     is_active: boolean;
     image_path: string | null;
 };
@@ -55,7 +58,9 @@ export default function EditItemModal({ show, onClose, onSuccess, item, categori
         uom_id: '',
         location_id: '',        // Change from location_id to location
         reorder_level: '0',
-        unit_price: '',
+        reorder_quantity: '0',
+        cost_price: '',
+        selling_price: '',
         is_active: true,
     });
     const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -76,7 +81,15 @@ export default function EditItemModal({ show, onClose, onSuccess, item, categori
                 uom_id: item.uom_id ? String(item.uom_id) : '',
                 location_id: item.location_id ? String(item.location_id) : '',  // Change from location_id to location
                 reorder_level: String(item.reorder_level) || '0',
-                unit_price: item.unit_price ? String(item.unit_price) : '',
+                reorder_quantity: item.reorder_quantity !== null && item.reorder_quantity !== undefined
+                    ? String(item.reorder_quantity)
+                    : '0',
+                cost_price: item.cost_price !== null && item.cost_price !== undefined
+                    ? String(item.cost_price)
+                    : (item.unit_price ? String(item.unit_price) : ''),
+                selling_price: item.selling_price !== null && item.selling_price !== undefined
+                    ? String(item.selling_price)
+                    : (item.unit_price ? String(item.unit_price) : ''),
                 is_active: item.is_active,
             });
 
@@ -173,7 +186,12 @@ export default function EditItemModal({ show, onClose, onSuccess, item, categori
                 console.error('Error response:', error.response?.data);
 
                 if (error.response?.data?.errors) {
-                    setErrors(error.response.data.errors);
+                    const apiErrors = error.response.data.errors as Record<string, string[] | string>;
+                    const flattened: Record<string, string> = {};
+                    Object.entries(apiErrors).forEach(([key, value]) => {
+                        flattened[key] = Array.isArray(value) ? value[0] : value;
+                    });
+                    setErrors(flattened);
                 } else if (error.response?.data?.message) {
                     setErrors({ general: error.response.data.message });
                 } else {
@@ -306,6 +324,7 @@ export default function EditItemModal({ show, onClose, onSuccess, item, categori
                                     name="category_id"
                                     value={formData.category_id}
                                     onChange={handleChange}
+                                    required
                                     disabled={isSubmitting}
                                     className="w-full py-3 px-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                                 >
@@ -326,6 +345,7 @@ export default function EditItemModal({ show, onClose, onSuccess, item, categori
                                     name="uom_id"
                                     value={formData.uom_id}
                                     onChange={handleChange}
+                                    required
                                     disabled={isSubmitting}
                                     className="w-full py-3 px-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                                 >
@@ -383,22 +403,62 @@ export default function EditItemModal({ show, onClose, onSuccess, item, categori
                             </div>
 
                             <div>
-                                <Label htmlFor="unit_price" className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Unit Price (Optional)
+                                <Label htmlFor="reorder_quantity" className="block text-sm font-semibold text-gray-700 mb-2">
+                                    Reorder Quantity *
                                 </Label>
                                 <Input
-                                    id="unit_price"
-                                    name="unit_price"
+                                    id="reorder_quantity"
+                                    name="reorder_quantity"
                                     type="number"
                                     min="0"
                                     step="0.01"
-                                    value={formData.unit_price}
+                                    required
+                                    value={formData.reorder_quantity}
+                                    onChange={handleChange}
+                                    disabled={isSubmitting}
+                                    className="py-3 px-4 rounded-xl border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                                />
+                                {errors.reorder_quantity && <p className="text-red-500 text-sm mt-1">{errors.reorder_quantity}</p>}
+                            </div>
+
+                            <div>
+                                <Label htmlFor="cost_price" className="block text-sm font-semibold text-gray-700 mb-2">
+                                    Cost Price *
+                                </Label>
+                                <Input
+                                    id="cost_price"
+                                    name="cost_price"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    required
+                                    value={formData.cost_price}
                                     onChange={handleChange}
                                     disabled={isSubmitting}
                                     placeholder="0.00"
                                     className="py-3 px-4 rounded-xl border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                                 />
-                                {errors.unit_price && <p className="text-red-500 text-sm mt-1">{errors.unit_price}</p>}
+                                {errors.cost_price && <p className="text-red-500 text-sm mt-1">{errors.cost_price}</p>}
+                            </div>
+
+                            <div>
+                                <Label htmlFor="selling_price" className="block text-sm font-semibold text-gray-700 mb-2">
+                                    Selling Price *
+                                </Label>
+                                <Input
+                                    id="selling_price"
+                                    name="selling_price"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    required
+                                    value={formData.selling_price}
+                                    onChange={handleChange}
+                                    disabled={isSubmitting}
+                                    placeholder="0.00"
+                                    className="py-3 px-4 rounded-xl border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                                />
+                                {errors.selling_price && <p className="text-red-500 text-sm mt-1">{errors.selling_price}</p>}
                             </div>
                         </div>
                     </div>

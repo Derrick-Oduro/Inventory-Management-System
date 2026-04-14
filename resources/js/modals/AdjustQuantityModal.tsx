@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { LoaderCircle, X, Plus, Minus, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,10 +9,16 @@ type InventoryItem = {
   id: number;
   name: string;
   sku: string;
-  quantity: number;
+  quantity: number | string;
+  location_id?: number | null;
   unit_of_measure?: {
     abbreviation: string;
   };
+};
+
+type Location = {
+  id: number;
+  name: string;
 };
 
 type AdjustQuantityModalProps = {
@@ -20,14 +26,23 @@ type AdjustQuantityModalProps = {
   onClose: () => void;
   onSuccess: () => void;
   item: InventoryItem | null;
+  locations: Location[];
 };
 
-export default function AdjustQuantityModal({ show, onClose, onSuccess, item }: AdjustQuantityModalProps) {
+export default function AdjustQuantityModal({ show, onClose, onSuccess, item, locations }: AdjustQuantityModalProps) {
   const [adjustmentType, setAdjustmentType] = useState<'add' | 'remove'>('add');
   const [quantity, setQuantity] = useState('1');
   const [reason, setReason] = useState('');
+  const [locationId, setLocationId] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (show && item && locations.length > 0) {
+      const fallback = item.location_id ? String(item.location_id) : String(locations[0].id);
+      setLocationId(fallback);
+    }
+  }, [show, item, locations]);
 
   if (!show || !item) return null;
 
@@ -48,10 +63,17 @@ export default function AdjustQuantityModal({ show, onClose, onSuccess, item }: 
       return;
     }
 
+    if (!locationId) {
+      setErrors({ location_id: 'Please select a location for this adjustment' });
+      setIsSubmitting(false);
+      return;
+    }
+
     const adjustmentData = {
       quantity: parseFloat(quantity),
-      adjustment_type: adjustmentType,
-      reason: reason
+      adjustment_mode: adjustmentType === 'add' ? 'increase' : 'decrease',
+      location_id: Number(locationId),
+      notes: reason.trim(),
     };
 
     axios.post(`/api/inventory/items/${item.id}/adjust`, adjustmentData)
@@ -62,11 +84,17 @@ export default function AdjustQuantityModal({ show, onClose, onSuccess, item }: 
         setAdjustmentType('add');
         setQuantity('1');
         setReason('');
+        setLocationId('');
       })
       .catch(error => {
         console.error('Error adjusting quantity:', error);
         if (error.response?.data?.errors) {
-          setErrors(error.response.data.errors);
+          const apiErrors = error.response.data.errors as Record<string, string[] | string>;
+          const flattened: Record<string, string> = {};
+          Object.entries(apiErrors).forEach(([key, value]) => {
+            flattened[key] = Array.isArray(value) ? value[0] : value;
+          });
+          setErrors(flattened);
         } else if (error.response?.data?.message) {
           setErrors({ general: error.response.data.message });
         }
@@ -163,6 +191,27 @@ export default function AdjustQuantityModal({ show, onClose, onSuccess, item }: 
               placeholder="Enter quantity"
             />
             {errors.quantity && <p className="text-red-500 text-sm mt-1">{errors.quantity}</p>}
+          </div>
+
+          <div>
+            <Label htmlFor="location_id" className="block text-sm font-semibold text-gray-700 mb-2">
+              Location *
+            </Label>
+            <select
+              id="location_id"
+              value={locationId}
+              onChange={(e) => setLocationId(e.target.value)}
+              disabled={isSubmitting}
+              className="w-full py-3 px-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+            >
+              <option value="">Select a location</option>
+              {locations.map((location) => (
+                <option key={location.id} value={location.id}>
+                  {location.name}
+                </option>
+              ))}
+            </select>
+            {errors.location_id && <p className="text-red-500 text-sm mt-1">{errors.location_id}</p>}
           </div>
 
           <div>

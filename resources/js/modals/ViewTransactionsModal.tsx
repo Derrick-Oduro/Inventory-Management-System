@@ -1,27 +1,54 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { LoaderCircle, X, ArrowUp, ArrowDown, Package, Clock, User } from 'lucide-react';
+import {
+  LoaderCircle,
+  X,
+  ArrowUpCircle,
+  ArrowDownCircle,
+  Repeat2,
+  SlidersHorizontal,
+  Undo2,
+  Package,
+  Clock,
+  User,
+  MapPin,
+} from 'lucide-react';
 
 type InventoryItem = {
   id: number;
   name: string;
   sku: string;
-  quantity: number;
+  quantity: number | string;
   unit_of_measure?: {
     abbreviation: string;
   };
 };
 
+type MovementType = 'stock_in' | 'stock_out' | 'transfer' | 'adjustment' | 'return';
+
 type Transaction = {
   id: number;
-  quantity: number;
-  previous_quantity: number;
-  transaction_type: string;
-  reason: string;
+  quantity: number | string;
+  movement_type: MovementType;
+  status: 'pending_approval' | 'approved' | 'rejected' | 'completed';
+  notes: string | null;
   created_at: string;
-  created_by?: {
+  from_location?: {
+    id: number;
     name: string;
-  };
+  } | null;
+  to_location?: {
+    id: number;
+    name: string;
+  } | null;
+  performed_by?: {
+    id: number;
+    name: string;
+  } | null;
+  approved_by?: {
+    id: number;
+    name: string;
+  } | null;
 };
 
 type ViewTransactionsModalProps = {
@@ -49,7 +76,6 @@ export default function ViewTransactionsModal({ show, onClose, item }: ViewTrans
 
     axios.get(`/api/inventory/items/${item.id}/transactions`)
       .then(response => {
-        console.log('Transaction data:', response.data); // Debug response
         setTransactions(response.data);
       })
       .catch(error => {
@@ -62,6 +88,65 @@ export default function ViewTransactionsModal({ show, onClose, item }: ViewTrans
   };
 
   if (!show || !item) return null;
+
+  const getMovementMeta = (movementType: MovementType) => {
+    switch (movementType) {
+      case 'stock_in':
+        return {
+          label: 'Stock In',
+          Icon: ArrowUpCircle,
+          iconClass: 'bg-emerald-500',
+          badgeClass: 'bg-emerald-100 text-emerald-700',
+        };
+      case 'stock_out':
+        return {
+          label: 'Stock Out',
+          Icon: ArrowDownCircle,
+          iconClass: 'bg-red-500',
+          badgeClass: 'bg-red-100 text-red-700',
+        };
+      case 'transfer':
+        return {
+          label: 'Transfer',
+          Icon: Repeat2,
+          iconClass: 'bg-blue-500',
+          badgeClass: 'bg-blue-100 text-blue-700',
+        };
+      case 'adjustment':
+        return {
+          label: 'Adjustment',
+          Icon: SlidersHorizontal,
+          iconClass: 'bg-amber-500',
+          badgeClass: 'bg-amber-100 text-amber-700',
+        };
+      case 'return':
+        return {
+          label: 'Return',
+          Icon: Undo2,
+          iconClass: 'bg-indigo-500',
+          badgeClass: 'bg-indigo-100 text-indigo-700',
+        };
+      default:
+        return {
+          label: movementType,
+          Icon: Package,
+          iconClass: 'bg-slate-500',
+          badgeClass: 'bg-slate-100 text-slate-700',
+        };
+    }
+  };
+
+  const getStatusClass = (status: Transaction['status']) => {
+    if (status === 'pending_approval') return 'bg-amber-100 text-amber-700';
+    if (status === 'approved') return 'bg-blue-100 text-blue-700';
+    if (status === 'rejected') return 'bg-red-100 text-red-700';
+    return 'bg-emerald-100 text-emerald-700';
+  };
+
+  const formatQuantity = (quantity: number | string) => {
+    const parsed = Number(quantity);
+    return Number.isFinite(parsed) ? parsed.toLocaleString() : String(quantity);
+  };
 
   const formatDate = (dateString: string) => {
     try {
@@ -147,37 +232,30 @@ export default function ViewTransactionsModal({ show, onClose, item }: ViewTrans
               <ul className="-mb-8">
                 {transactions.map((transaction, index) => (
                   <li key={transaction.id}>
+                    {(() => {
+                      const meta = getMovementMeta(transaction.movement_type);
+                      const Icon = meta.Icon;
+
+                      return (
                     <div className="relative pb-8">
                       {index !== transactions.length - 1 ? (
                         <span className="absolute top-5 left-5 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
                       ) : null}
                       <div className="relative flex items-start space-x-3">
                         <div className="relative">
-                          <div className={`h-12 w-12 rounded-xl flex items-center justify-center ring-8 ring-white shadow-lg ${
-                            transaction.transaction_type === 'add'
-                              ? 'bg-gradient-to-br from-green-500 to-green-600'
-                              : transaction.transaction_type === 'remove'
-                                ? 'bg-gradient-to-br from-red-500 to-red-600'
-                                : 'bg-gradient-to-br from-gray-500 to-gray-600'
-                          }`}>
-                            {transaction.transaction_type === 'add' ? (
-                              <ArrowUp className="h-6 w-6 text-white" />
-                            ) : transaction.transaction_type === 'remove' ? (
-                              <ArrowDown className="h-6 w-6 text-white" />
-                            ) : (
-                              <Package className="h-6 w-6 text-white" />
-                            )}
+                          <div className={`h-12 w-12 rounded-xl flex items-center justify-center ring-8 ring-white shadow-lg ${meta.iconClass}`}>
+                            <Icon className="h-6 w-6 text-white" />
                           </div>
                         </div>
                         <div className="min-w-0 flex-1">
                           <div>
-                            <div className="text-base">
-                              <span className="font-bold text-gray-900">
-                                {transaction.transaction_type === 'add'
-                                  ? 'Stock Added'
-                                  : transaction.transaction_type === 'remove'
-                                    ? 'Stock Removed'
-                                    : 'Adjustment'}
+                            <div className="text-base flex items-center gap-2">
+                              <span className="font-bold text-gray-900">{meta.label}</span>
+                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusClass(transaction.status)}`}>
+                                {transaction.status.replace('_', ' ')}
+                              </span>
+                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${meta.badgeClass}`}>
+                                Qty: {formatQuantity(transaction.quantity)}
                               </span>
                             </div>
                             <p className="mt-1 text-sm text-gray-500 flex items-center gap-4">
@@ -187,36 +265,30 @@ export default function ViewTransactionsModal({ show, onClose, item }: ViewTrans
                               </span>
                               <span className="flex items-center gap-1">
                                 <User className="h-3.5 w-3.5" />
-                                {transaction.created_by ? transaction.created_by.name : 'Unknown User'}
+                                {transaction.performed_by ? transaction.performed_by.name : 'Unknown User'}
                               </span>
                             </p>
                           </div>
                           <div className="mt-3 bg-white border border-gray-200 p-4 rounded-xl shadow-sm">
-                            <div className="flex justify-between items-center mb-2">
-                              <span className={`text-sm font-bold px-3 py-1 rounded-full ${
-                                transaction.transaction_type === 'add'
-                                  ? 'bg-green-100 text-green-800'
-                                  : 'bg-red-100 text-red-800'
-                              }`}>
-                                {transaction.transaction_type === 'add'
-                                  ? `+${transaction.quantity}`
-                                  : `-${transaction.quantity}`}
-                              </span>
-                              <span className="text-sm font-mono bg-gray-100 px-3 py-1 rounded-full text-gray-600">
-                                {transaction.previous_quantity} → {
-                                  // Calculate the new quantity based on transaction type
-                                  transaction.previous_quantity +
-                                  (transaction.transaction_type === 'add' ? transaction.quantity : -transaction.quantity)
-                                }
-                              </span>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2 text-sm text-gray-700">
+                              <div className="flex items-center gap-1">
+                                <MapPin className="h-3.5 w-3.5 text-gray-400" />
+                                From: {transaction.from_location?.name || '-'}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <MapPin className="h-3.5 w-3.5 text-gray-400" />
+                                To: {transaction.to_location?.name || '-'}
+                              </div>
                             </div>
                             <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded-lg">
-                              <span className="font-medium">Reason:</span> {transaction.reason || 'No reason provided'}
+                              <span className="font-medium">Notes:</span> {transaction.notes || 'No notes provided'}
                             </p>
                           </div>
                         </div>
                       </div>
                     </div>
+                      );
+                    })()}
                   </li>
                 ))}
               </ul>

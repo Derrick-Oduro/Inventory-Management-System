@@ -4,14 +4,12 @@ import { usePage } from '@inertiajs/react';
 import axios from 'axios';
 import { Head } from '@inertiajs/react';
 import {
-    Search, Plus, RefreshCw, Archive, Filter, Package,
-    Edit, Trash2, Eye, ArrowUpDown, Clipboard, Boxes,
-    AlertTriangle, CheckCircle, FileText, PlusCircle, MapPin,
-    ChevronDown, TrendingDown, TrendingUp, DollarSign
+    Search, Plus, RefreshCw, Filter, Package,
+    Edit, ArrowUpDown, Clipboard, ArrowRightLeft,
+    AlertTriangle, CheckCircle, PlusCircle, MapPin,
+    ChevronDown, TrendingDown, DollarSign
 } from 'lucide-react';
 import type { PageProps } from '@/types';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import CreateItemModal from '@/modals/CreateItemModal';
 import EditItemModal from '@/modals/EditItemModal';
 import AdjustQuantityModal from '@/modals/AdjustQuantityModal';
@@ -21,6 +19,7 @@ import CreateUnitModal from '@/modals/CreateUnitModal';
 import CreateLocationModal from '@/modals/CreateLocationModal';
 import ViewLocationsModal from '@/modals/ViewLocationsModal';
 import ManageInventoryOptionsModal from '@/modals/ManageInventoryOptionsModal';
+import RecordStockMovementModal from '@/modals/RecordStockMovementModal';
 
 type Category = {
     id: number;
@@ -49,11 +48,15 @@ type InventoryItem = {
         name: string;
         abbreviation: string;
     };
-    quantity: number;
-    reorder_level: number;
-    unit_price: number | null;
+    location_id?: number | null;
+    quantity: number | string;
+    reorder_level: number | string;
+    reorder_quantity?: number | string | null;
+    cost_price?: number | string | null;
+    selling_price?: number | string | null;
+    unit_price?: number | string | null;
     is_active: boolean;
-    location: string | null;
+    location: { id?: number; name?: string } | string | null;
     image_path: string | null;
     created_at: string;
     updated_at: string;
@@ -68,7 +71,8 @@ type Location = {
 export default function Inventory() {
     const { auth } = usePage<PageProps>().props;
     const role = auth.user.role?.name;
-    const isAdmin = role === 'Admin';
+    const canManageCatalog = role === 'Admin' || role === 'Inventory Manager';
+    const canRecordMovements = ['Admin', 'Inventory Manager', 'Staff'].includes(role ?? '');
 
     const [items, setItems] = useState<InventoryItem[]>([]);
     const [filteredItems, setFilteredItems] = useState<InventoryItem[]>([]);
@@ -95,6 +99,8 @@ export default function Inventory() {
     const [showCreateLocationModal, setShowCreateLocationModal] = useState(false);
     const [showViewLocationsModal, setShowViewLocationsModal] = useState(false);
     const [showManageOptionsModal, setShowManageOptionsModal] = useState(false);
+    const [showMovementModal, setShowMovementModal] = useState(false);
+    const [movementItemId, setMovementItemId] = useState<number | null>(null);
     const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
 
     useEffect(() => {
@@ -142,10 +148,11 @@ export default function Inventory() {
         if (searchQuery.trim() !== '') {
             const query = searchQuery.toLowerCase();
             filtered = filtered.filter(item =>
-                item.name.toLowerCase().includes(query) ||
-                item.sku.toLowerCase().includes(query) ||
-                (item.description && item.description.toLowerCase().includes(query)) ||
-                (item.location && item.location.toLowerCase().includes(query))
+                (item.name ?? '').toLowerCase().includes(query) ||
+                (item.sku ?? '').toLowerCase().includes(query) ||
+                ((item.description ?? '').toLowerCase().includes(query)) ||
+                ((item.category?.name ?? '').toLowerCase().includes(query)) ||
+                getLocationName(item).toLowerCase().includes(query)
             );
         }
 
@@ -216,6 +223,11 @@ export default function Inventory() {
         setShowAdjustModal(true);
     };
 
+    const handleRecordMovement = (item?: InventoryItem) => {
+        setMovementItemId(item?.id ?? null);
+        setShowMovementModal(true);
+    };
+
     const handleViewTransactions = (item: InventoryItem) => {
         setSelectedItem(item);
         setShowTransactionsModal(true);
@@ -242,36 +254,45 @@ export default function Inventory() {
     };
 
     const renderStockStatus = (item: InventoryItem) => {
-        // Convert to numbers for proper comparison
         const quantity = Number(item.quantity);
         const reorderLevel = Number(item.reorder_level);
 
-        console.log(`Item: ${item.name}, Quantity: ${quantity} (type: ${typeof quantity}), Reorder Level: ${reorderLevel} (type: ${typeof reorderLevel})`);
-
         if (quantity <= 0) {
             return (
-                <span className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-full bg-gradient-to-r from-red-500 to-red-600 text-white shadow-sm">
+                <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
                     <AlertTriangle className="h-3 w-3" />
                     Out of Stock
                 </span>
             );
-        } else if (quantity <= reorderLevel) { // Now comparing numbers instead of strings
-            console.log(`LOW STOCK: ${item.name} - Quantity: ${quantity}, Reorder: ${reorderLevel}`);
+        }
+
+        if (quantity <= reorderLevel) {
             return (
-                <span className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-full bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-sm">
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
                     <AlertTriangle className="h-3 w-3" />
                     Low Stock
                 </span>
             );
-        } else {
-            console.log(`IN STOCK: ${item.name} - Quantity: ${quantity}, Reorder: ${reorderLevel}`);
-            return (
-                <span className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-full bg-gradient-to-r from-green-500 to-green-600 text-white shadow-sm">
-                    <CheckCircle className="h-3 w-3" />
-                    In Stock
-                </span>
-            );
         }
+
+        return (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                <CheckCircle className="h-3 w-3" />
+                In Stock
+            </span>
+        );
+    };
+
+    const getLocationName = (item: InventoryItem): string => {
+        if (typeof item.location === 'string') {
+            return item.location;
+        }
+
+        if (item.location && typeof item.location.name === 'string') {
+            return item.location.name;
+        }
+
+        return '';
     };
 
     const fetchLocations = () => {
@@ -296,8 +317,11 @@ export default function Inventory() {
         ).length;
         const outOfStock = items.filter(item => item.is_active && Number(item.quantity) <= 0).length;
         const totalValue = items
-            .filter(item => item.is_active && item.unit_price)
-            .reduce((sum, item) => sum + (Number(item.quantity) * (Number(item.unit_price) || 0)), 0);
+            .filter(item => item.is_active)
+            .reduce((sum, item) => {
+                const unitCost = Number(item.cost_price ?? item.unit_price ?? 0);
+                return sum + (Number(item.quantity) * unitCost);
+            }, 0);
 
         return { total, lowStock, outOfStock, totalValue };
     };
@@ -306,75 +330,85 @@ export default function Inventory() {
 
     return (
         <AppLayout>
-            <Head title="Inventory Management" />
+            <Head title="Products & Stock" />
 
             {/* Header Section */}
-            <div className="mb-8">
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            <div className="mb-4">
+                <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
                     <div>
-                        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent mb-2">
-                            Inventory Management
-                        </h1>
-                        <p className="text-gray-600">Track and manage your inventory items</p>
+                        <h1 className="text-2xl font-semibold text-slate-900">Products & Stock</h1>
+                        <p className="text-sm text-slate-600">Track and manage your inventory items</p>
                     </div>
 
-                    {isAdmin && (
-                        <div className="flex flex-wrap gap-3">
+                    <div className="flex flex-wrap gap-3">
+                        {canRecordMovements && (
                             <button
-                                onClick={handleCreateItem}
-                                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+                                onClick={() => handleRecordMovement()}
+                                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700"
                             >
-                                <Plus className="h-5 w-5" />
-                                Add Item
+                                <ArrowRightLeft className="h-4 w-4" />
+                                Record Movement
                             </button>
-                            <button
-                                onClick={handleCreateCategory}
-                                className="bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-semibold py-3 px-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
-                            >
-                                <PlusCircle className="h-4 w-4" />
-                                Category
-                            </button>
-                            <button
-                                onClick={handleCreateUnit}
-                                className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold py-3 px-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
-                            >
-                                <PlusCircle className="h-4 w-4" />
-                                Unit
-                            </button>
-                            <button
-                                onClick={handleCreateLocation}
-                                className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold py-3 px-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
-                            >
-                                <MapPin className="h-4 w-4" />
-                                Location
-                            </button>
-                        </div>
-                    )}
+                        )}
+
+                        {canManageCatalog && (
+                            <>
+                                <button
+                                    onClick={handleCreateItem}
+                                    className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white"
+                                >
+                                    <Plus className="h-4 w-4" />
+                                    Add Item
+                                </button>
+                                <button
+                                    onClick={handleCreateCategory}
+                                    className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700"
+                                >
+                                    <PlusCircle className="h-4 w-4" />
+                                    Category
+                                </button>
+                                <button
+                                    onClick={handleCreateUnit}
+                                    className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700"
+                                >
+                                    <PlusCircle className="h-4 w-4" />
+                                    Unit
+                                </button>
+                                <button
+                                    onClick={handleCreateLocation}
+                                    className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700"
+                                >
+                                    <MapPin className="h-4 w-4" />
+                                    Location
+                                </button>
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
                 <StatCard
-                    icon={<Package className="w-6 h-6" />}
+                    icon={<Package className="h-5 w-5" />}
                     label="Total Items"
                     value={stats.total}
                     color="blue"
                 />
                 <StatCard
-                    icon={<TrendingDown className="w-6 h-6" />}
+                    icon={<TrendingDown className="h-5 w-5" />}
                     label="Low Stock"
                     value={stats.lowStock}
                     color="amber"
                 />
                 <StatCard
-                    icon={<AlertTriangle className="w-6 h-6" />}
+                    icon={<AlertTriangle className="h-5 w-5" />}
                     label="Out of Stock"
                     value={stats.outOfStock}
                     color="red"
                 />
                 <StatCard
-                    icon={<DollarSign className="w-6 h-6" />}
+                    icon={<DollarSign className="h-5 w-5" />}
                     label="Total Value"
                     value={`$${stats.totalValue.toLocaleString()}`}
                     color="green"
@@ -383,18 +417,18 @@ export default function Inventory() {
             </div>
 
             {/* Search and Filters */}
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-8">
-                <div className="flex flex-col lg:flex-row gap-4">
+            <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4">
+                <div className="flex flex-col gap-3 lg:flex-row">
                     {/* Search Bar */}
                     <div className="flex-1">
                         <div className="relative">
-                            <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
-                                <Search className="h-5 w-5 text-gray-400" />
+                            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                <Search className="h-4 w-4 text-slate-400" />
                             </div>
                             <input
                                 type="text"
-                                className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-gray-900 placeholder-gray-500"
-                                placeholder="Search by name, SKU, description, or location..."
+                                className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm text-slate-900 placeholder-slate-500"
+                                placeholder="Search by name, SKU, category, description, or location..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
@@ -404,10 +438,10 @@ export default function Inventory() {
                     {/* Filter Toggle */}
                     <button
                         onClick={() => setShowFilters(!showFilters)}
-                        className={`flex items-center gap-2 px-4 py-3 rounded-xl font-medium transition-all duration-200 ${
+                        className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
                             showFilters
-                                ? 'bg-blue-100 text-blue-700 border border-blue-200'
-                                : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
+                                ? 'border-blue-200 bg-blue-50 text-blue-700'
+                                : 'border-slate-300 text-slate-700 hover:bg-slate-50'
                         }`}
                     >
                         <Filter className="h-4 w-4" />
@@ -418,7 +452,7 @@ export default function Inventory() {
                     {/* Refresh Button */}
                     <button
                         onClick={fetchInventoryData}
-                        className="flex items-center gap-2 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl border border-gray-200 transition-all duration-200"
+                        className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                         disabled={isLoading}
                     >
                         <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
@@ -428,12 +462,12 @@ export default function Inventory() {
 
                 {/* Expandable Filters */}
                 {showFilters && (
-                    <div className="mt-6 pt-6 border-t border-gray-200">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div className="mt-4 border-t border-slate-200 pt-4">
+                        <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-3">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                                <label className="mb-1 block text-xs font-medium text-slate-700">Category</label>
                                 <select
-                                    className="w-full py-3 px-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                                     value={categoryFilter}
                                     onChange={(e) => setCategoryFilter(e.target.value)}
                                 >
@@ -448,9 +482,9 @@ export default function Inventory() {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                                <label className="mb-1 block text-xs font-medium text-slate-700">Status</label>
                                 <select
-                                    className="w-full py-3 px-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                                     value={statusFilter}
                                     onChange={(e) => setStatusFilter(e.target.value)}
                                 >
@@ -459,36 +493,38 @@ export default function Inventory() {
                                     <option value="inactive">Inactive Only</option>
                                 </select>
                             </div>
-                            <div className="flex items-end">
-                                <button
-                                    onClick={handleManageOptions}
-                                    className="w-full bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-semibold py-3 px-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2"
-                                >
-                                    <Package className="h-4 w-4" />
-                                    Manage
-                                </button>
-                            </div>
+                            {canManageCatalog && (
+                                <div className="flex items-end">
+                                    <button
+                                        onClick={handleManageOptions}
+                                        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white"
+                                    >
+                                        <Package className="h-4 w-4" />
+                                        Manage
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
                         <div className="flex flex-wrap gap-4">
-                            <label className="inline-flex items-center text-sm text-gray-700">
+                            <label className="inline-flex items-center text-sm text-slate-700">
                                 <input
                                     type="checkbox"
-                                    className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                                    className="rounded border-slate-300 text-blue-600"
                                     checked={showInactiveItems}
                                     onChange={(e) => setShowInactiveItems(e.target.checked)}
                                 />
-                                <span className="ml-2 font-medium">Show Inactive Items</span>
+                                <span className="ml-2">Show Inactive Items</span>
                             </label>
 
-                            <label className="inline-flex items-center text-sm text-gray-700">
+                            <label className="inline-flex items-center text-sm text-slate-700">
                                 <input
                                     type="checkbox"
-                                    className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                                    className="rounded border-slate-300 text-blue-600"
                                     checked={showLowStock}
                                     onChange={(e) => setShowLowStock(e.target.checked)}
                                 />
-                                <span className="ml-2 font-medium">Show Low Stock Only</span>
+                                <span className="ml-2">Show Low Stock Only</span>
                             </label>
                         </div>
                     </div>
@@ -496,35 +532,35 @@ export default function Inventory() {
             </div>
 
             {/* Inventory Items */}
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
                 {isLoading ? (
-                    <div className="flex justify-center items-center h-64">
+                    <div className="flex h-40 items-center justify-center">
                         <div className="flex items-center gap-3">
                             <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
-                            <span className="text-gray-600 font-medium">Loading inventory...</span>
+                            <span className="text-sm text-slate-600">Loading inventory...</span>
                         </div>
                     </div>
                 ) : filteredItems.length === 0 ? (
-                    <div className="flex flex-col justify-center items-center h-64">
-                        <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-full p-6 mb-4">
-                            <Package className="h-16 w-16 text-gray-400" />
+                    <div className="flex h-40 flex-col items-center justify-center">
+                        <div className="mb-3 rounded-full bg-slate-100 p-4">
+                            <Package className="h-8 w-8 text-slate-400" />
                         </div>
-                        <h3 className="text-xl font-semibold text-gray-800 mb-2">No inventory items found</h3>
-                        <p className="text-gray-500 mb-4">
+                        <h3 className="mb-1 text-base font-semibold text-slate-800">No inventory items found</h3>
+                        <p className="mb-3 text-sm text-slate-500">
                             {searchQuery ? 'Try adjusting your search terms or filters' : 'Get started by adding your first inventory item'}
                         </p>
                         {searchQuery && (
                             <button
                                 onClick={() => setSearchQuery('')}
-                                className="text-blue-600 hover:text-blue-700 font-medium"
+                                className="text-sm font-medium text-blue-600 hover:text-blue-700"
                             >
                                 Clear search
                             </button>
                         )}
-                        {isAdmin && !searchQuery && (
+                        {canManageCatalog && !searchQuery && (
                             <button
                                 onClick={handleCreateItem}
-                                className="mt-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+                                className="mt-2 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white"
                             >
                                 <Plus className="h-4 w-4" />
                                 Add your first item
@@ -533,12 +569,12 @@ export default function Inventory() {
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="min-w-full">
-                            <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+                        <table className="min-w-full text-sm">
+                            <thead className="bg-slate-50">
                                 <tr>
-                                    <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                    <th scope="col" className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                                         <button
-                                            className="flex items-center space-x-1 hover:text-blue-600 transition-colors"
+                                            className="flex items-center space-x-1 transition-colors hover:text-blue-600"
                                             onClick={() => handleSort('name')}
                                         >
                                             <span>Item</span>
@@ -547,9 +583,9 @@ export default function Inventory() {
                                             )}
                                         </button>
                                     </th>
-                                    <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                    <th scope="col" className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                                         <button
-                                            className="flex items-center space-x-1 hover:text-blue-600 transition-colors"
+                                            className="flex items-center space-x-1 transition-colors hover:text-blue-600"
                                             onClick={() => handleSort('sku')}
                                         >
                                             <span>SKU</span>
@@ -558,12 +594,12 @@ export default function Inventory() {
                                             )}
                                         </button>
                                     </th>
-                                    <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                    <th scope="col" className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                                         Category
                                     </th>
-                                    <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                    <th scope="col" className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                                         <button
-                                            className="flex items-center space-x-1 hover:text-blue-600 transition-colors"
+                                            className="flex items-center space-x-1 transition-colors hover:text-blue-600"
                                             onClick={() => handleSort('quantity')}
                                         >
                                             <span>Stock</span>
@@ -572,131 +608,145 @@ export default function Inventory() {
                                             )}
                                         </button>
                                     </th>
-                                    <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                    <th scope="col" className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                                         Status
                                     </th>
-                                    <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                    <th scope="col" className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                                         <button
-                                            className="flex items-center space-x-1 hover:text-blue-600 transition-colors"
-                                            onClick={() => handleSort('unit_price')}
+                                            className="flex items-center space-x-1 transition-colors hover:text-blue-600"
+                                            onClick={() => handleSort('cost_price')}
                                         >
-                                            <span>Price</span>
-                                            {sortField === 'unit_price' && (
+                                            <span>Cost / Sell</span>
+                                            {sortField === 'cost_price' && (
                                                 <ArrowUpDown className="h-3 w-3" />
                                             )}
                                         </button>
                                     </th>
-                                    <th scope="col" className="px-6 py-4 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                    <th scope="col" className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">
                                         Actions
                                     </th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100">
+                            <tbody className="divide-y divide-slate-100">
                                 {filteredItems.map((item) => (
                                     <tr
                                         key={item.id}
-                                        className={`${!item.is_active ? 'bg-gray-50 opacity-70' : 'hover:bg-gray-50'} transition-colors duration-200`}
+                                        className={`${!item.is_active ? 'bg-slate-50/70 opacity-80' : 'hover:bg-slate-50'} transition-colors`}
                                     >
-                                        <td className="px-6 py-4">
+                                        <td className="px-3 py-2.5">
                                             <div className="flex items-center">
                                                 {item.image_path ? (
-                                                    <div className="flex-shrink-0 h-12 w-12 mr-4">
+                                                    <div className="mr-3 h-10 w-10 flex-shrink-0">
                                                         <img
-                                                            className="h-12 w-12 rounded-xl object-cover shadow-sm border border-gray-200"
+                                                            className="h-10 w-10 rounded-lg border border-slate-200 object-cover"
                                                             src={`/storage/${item.image_path}`}
                                                             alt={item.name}
                                                         />
                                                     </div>
                                                 ) : (
-                                                    <div className="flex-shrink-0 h-12 w-12 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl flex items-center justify-center mr-4 shadow-sm border border-gray-200">
-                                                        <Package className="h-6 w-6 text-gray-500" />
+                                                    <div className="mr-3 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-100">
+                                                        <Package className="h-5 w-5 text-slate-500" />
                                                     </div>
                                                 )}
                                                 <div>
-                                                    <div className="font-semibold text-gray-900 text-lg">
+                                                    <div className="text-sm font-medium text-slate-900">
                                                         {item.name}
                                                     </div>
-                                                    {item.location && (
-                                                        <div className="text-sm text-gray-500 flex items-center gap-1">
+                                                    {getLocationName(item) && (
+                                                        <div className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
                                                             <MapPin className="h-3 w-3" />
-                                                            {item.location}
+                                                            {getLocationName(item)}
                                                         </div>
                                                     )}
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <span className="font-mono text-sm text-gray-800 bg-gray-100 px-2 py-1 rounded-lg">
+                                        <td className="px-3 py-2.5">
+                                            <span className="rounded bg-slate-100 px-2 py-0.5 font-mono text-xs text-slate-700">
                                                 {item.sku}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4">
+                                        <td className="px-3 py-2.5">
                                             {item.category?.name ? (
-                                                <span className="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                                                <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
                                                     {item.category.name}
                                                 </span>
                                             ) : (
-                                                <span className="text-gray-400">-</span>
+                                                <span className="text-slate-400">-</span>
                                             )}
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="text-lg font-bold text-gray-900">
+                                        <td className="px-3 py-2.5">
+                                            <div className="text-sm font-semibold text-slate-900">
                                                 {item.quantity}
                                             </div>
-                                            <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full inline-block">
-                                                Reorder at: {item.reorder_level}
+                                            <div className="mt-0.5 text-xs text-slate-500">
+                                                Level: {item.reorder_level} | Reorder Qty: {item.reorder_quantity ?? '-'}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="space-y-2">
+                                        <td className="px-3 py-2.5">
+                                            <div className="space-y-1">
                                                 {renderStockStatus(item)}
                                                 {!item.is_active && (
                                                     <div>
-                                                        <span className="inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full bg-gray-200 text-gray-700">
+                                                        <span className="inline-flex items-center rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">
                                                             Inactive
                                                         </span>
                                                     </div>
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            {item.unit_price ? (
-                                                <span className="font-semibold text-green-600 text-lg">
-                                                    ${parseFloat(item.unit_price.toString()).toFixed(2)}
-                                                </span>
-                                            ) : (
-                                                <span className="text-gray-400">-</span>
-                                            )}
+                                        <td className="px-3 py-2.5">
+                                            <div className="text-xs text-slate-600">
+                                                <div>
+                                                    Cost: <span className="font-medium text-slate-900">${Number(item.cost_price ?? item.unit_price ?? 0).toFixed(2)}</span>
+                                                </div>
+                                                <div>
+                                                    Sell: <span className="font-medium text-slate-900">${Number(item.selling_price ?? item.unit_price ?? 0).toFixed(2)}</span>
+                                                </div>
+                                            </div>
                                         </td>
-                                        <td className="px-6 py-4">
+                                        <td className="px-3 py-2.5">
                                             <div className="flex justify-end space-x-2">
                                                 <button
-                                                    className="p-2 text-indigo-600 hover:text-indigo-900 hover:bg-indigo-50 rounded-xl transition-all duration-200"
+                                                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-indigo-600 hover:bg-indigo-50 hover:text-indigo-900"
                                                     onClick={() => handleViewTransactions(item)}
                                                     title="View Transaction History"
                                                 >
-                                                    <Clipboard className="h-5 w-5" />
+                                                    <Clipboard className="h-4 w-4" />
                                                 </button>
 
-                                                {isAdmin && (
+                                                {canRecordMovements && (
                                                     <>
                                                         <button
-                                                            className="p-2 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-xl transition-all duration-200"
-                                                            onClick={() => handleAdjustQuantity(item)}
-                                                            title="Adjust Quantity"
+                                                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-blue-600 hover:bg-blue-50 hover:text-blue-900 disabled:cursor-not-allowed disabled:opacity-40"
+                                                            disabled={!item.is_active}
+                                                            onClick={() => handleRecordMovement(item)}
+                                                            title={item.is_active ? 'Record Movement' : 'Inactive items cannot have stock movements'}
                                                         >
-                                                            <Package className="h-5 w-5" />
+                                                            <ArrowRightLeft className="h-4 w-4" />
                                                         </button>
 
                                                         <button
-                                                            className="p-2 text-amber-600 hover:text-amber-900 hover:bg-amber-50 rounded-xl transition-all duration-200"
-                                                            onClick={() => handleEditItem(item)}
-                                                            title="Edit Item"
+                                                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-blue-600 hover:bg-blue-50 hover:text-blue-900 disabled:cursor-not-allowed disabled:opacity-40"
+                                                            disabled={!item.is_active}
+                                                            onClick={() => handleAdjustQuantity(item)}
+                                                            title={item.is_active ? 'Manual Adjustment' : 'Inactive items cannot have stock movements'}
                                                         >
-                                                            <Edit className="h-5 w-5" />
+                                                            <Package className="h-4 w-4" />
                                                         </button>
+
+                                                        {canManageCatalog && (
+                                                            <button
+                                                                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-amber-600 hover:bg-amber-50 hover:text-amber-900"
+                                                                onClick={() => handleEditItem(item)}
+                                                                title="Edit Item"
+                                                            >
+                                                                <Edit className="h-4 w-4" />
+                                                            </button>
+                                                        )}
                                                     </>
                                                 )}
+
                                             </div>
                                         </td>
                                     </tr>
@@ -732,6 +782,7 @@ export default function Inventory() {
                 onClose={() => setShowAdjustModal(false)}
                 onSuccess={fetchInventoryData}
                 item={selectedItem}
+                locations={locations}
             />
 
             <ViewTransactionsModal
@@ -764,13 +815,32 @@ export default function Inventory() {
             <ViewLocationsModal
                 show={showViewLocationsModal}
                 onClose={() => setShowViewLocationsModal(false)}
-                locations={locations}
             />
 
             <ManageInventoryOptionsModal
                 show={showManageOptionsModal}
                 onClose={() => setShowManageOptionsModal(false)}
                 onSuccess={fetchInventoryData}
+            />
+
+            <RecordStockMovementModal
+                show={showMovementModal}
+                onClose={() => {
+                    setShowMovementModal(false);
+                    setMovementItemId(null);
+                }}
+                onSuccess={fetchInventoryData}
+                items={items.map((item) => ({
+                    id: item.id,
+                    name: item.name,
+                    sku: item.sku,
+                    is_active: item.is_active,
+                }))}
+                locations={locations.map((location) => ({
+                    id: location.id,
+                    name: location.name,
+                }))}
+                initialItemId={movementItemId}
             />
         </AppLayout>
     );
@@ -790,24 +860,24 @@ function StatCard({
     isValue?: boolean;
 }) {
     const colorClasses = {
-        blue: 'bg-gradient-to-br from-blue-500 to-blue-600',
-        green: 'bg-gradient-to-br from-green-500 to-green-600',
-        amber: 'bg-gradient-to-br from-amber-500 to-amber-600',
-        red: 'bg-gradient-to-br from-red-500 to-red-600',
-        purple: 'bg-gradient-to-br from-purple-500 to-purple-600',
+        blue: 'bg-blue-100 text-blue-700',
+        green: 'bg-emerald-100 text-emerald-700',
+        amber: 'bg-amber-100 text-amber-700',
+        red: 'bg-red-100 text-red-700',
+        purple: 'bg-purple-100 text-purple-700',
     }[color];
 
     return (
-        <div className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 border border-gray-100">
-            <div className="flex items-center justify-between mb-4">
-                <div className={`${colorClasses} text-white rounded-xl p-3 shadow-lg`}>
+        <div className="rounded-xl border border-slate-200 bg-white p-3">
+            <div className="flex items-center justify-between">
+                <div className={`${colorClasses} rounded-lg p-2`}>
                     {icon}
                 </div>
             </div>
-            <div className="text-3xl font-bold text-gray-800 mb-1">
+            <div className="mt-2 text-xl font-semibold text-slate-900">
                 {isValue ? value : typeof value === 'number' ? value.toLocaleString() : value}
             </div>
-            <div className="text-gray-600 font-medium">{label}</div>
+            <div className="text-xs text-slate-500">{label}</div>
         </div>
     );
 }

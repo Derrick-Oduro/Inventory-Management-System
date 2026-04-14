@@ -12,11 +12,7 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // Check for expired tickets every 15 minutes
-        $schedule->command('tickets:check-expired')
-                 ->everyFifteenMinutes()
-                 ->withoutOverlapping()
-                 ->runInBackground();
+        // Intentionally left open for IMS jobs (low-stock checks, backups, etc.).
     }
 
     /**
@@ -28,9 +24,4 @@ class Kernel extends ConsoleKernel
 
         require base_path('routes/console.php');
     }
-
-    protected $middlewareAliases = [
-        // ... existing middleware
-        'active.user' => \App\Http\Middleware\CheckUserActive::class,
-    ];
 }

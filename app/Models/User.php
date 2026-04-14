@@ -42,14 +42,29 @@ class User extends Authenticatable
         return $this->belongsTo(Role::class);
     }
 
-    public function submittedTickets()
+    public function createdPurchaseOrders()
     {
-        return $this->hasMany(Ticket::class, 'submitted_by');
+        return $this->hasMany(PurchaseOrder::class, 'created_by');
     }
 
-    public function assignedTickets()
+    public function approvedPurchaseOrders()
     {
-        return $this->hasMany(Ticket::class, 'assigned_to');
+        return $this->hasMany(PurchaseOrder::class, 'approved_by');
+    }
+
+    public function performedStockMovements()
+    {
+        return $this->hasMany(StockMovement::class, 'performed_by');
+    }
+
+    public function approvedStockMovements()
+    {
+        return $this->hasMany(StockMovement::class, 'approved_by');
+    }
+
+    public function notificationPreferences()
+    {
+        return $this->hasMany(NotificationPreference::class);
     }
 
     // Scope to get only active users

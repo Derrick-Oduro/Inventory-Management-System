@@ -20,6 +20,8 @@ export interface NavItem {
     href: string;
     icon?: LucideIcon | null;
     isActive?: boolean;
+    description?: string;
+    color?: 'emerald' | 'red' | 'purple' | 'orange' | 'blue';
 }
 
 export interface SharedData {

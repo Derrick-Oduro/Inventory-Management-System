@@ -12,12 +12,12 @@ return new class extends Migration {
     {
         Schema::create('stock_transactions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('item_id')->constrained('inventory_items')->onDelete('cascade');
+            $table->unsignedBigInteger('item_id');
             $table->enum('type', ['in', 'out']);
             $table->integer('quantity');
             $table->string('reason')->nullable();
-            $table->foreignId('location_id')->constrained('locations');
-            $table->foreignId('user_id')->constrained('users');
+            $table->unsignedBigInteger('location_id');
+            $table->unsignedBigInteger('user_id');
             $table->timestamps();
         });
 

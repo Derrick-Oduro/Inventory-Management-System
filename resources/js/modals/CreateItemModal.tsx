@@ -46,7 +46,9 @@ export default function CreateItemModal({
         uom_id: '',
         quantity: '0',
         reorder_level: '0',
-        unit_price: '',
+        reorder_quantity: '0',
+        cost_price: '',
+        selling_price: '',
         location_id: '',
         is_active: true
     });
@@ -134,16 +136,50 @@ export default function CreateItemModal({
             newErrors.sku = 'SKU is required';
         }
 
+        if (!formData.category_id) {
+            newErrors.category_id = 'Category is required';
+        }
+
+        if (!formData.uom_id) {
+            newErrors.uom_id = 'Unit is required';
+        }
+
         if (formData.quantity && parseFloat(formData.quantity) < 0) {
             newErrors.quantity = 'Quantity cannot be negative';
+        }
+
+        if (parseFloat(formData.quantity || '0') > 0 && !formData.location_id) {
+            newErrors.location_id = 'Location is required when initial quantity is greater than zero';
         }
 
         if (formData.reorder_level && parseFloat(formData.reorder_level) < 0) {
             newErrors.reorder_level = 'Reorder level cannot be negative';
         }
 
-        if (formData.unit_price && parseFloat(formData.unit_price) < 0) {
-            newErrors.unit_price = 'Price cannot be negative';
+        if (formData.reorder_quantity === '') {
+            newErrors.reorder_quantity = 'Reorder quantity is required';
+        } else if (parseFloat(formData.reorder_quantity) < 0) {
+            newErrors.reorder_quantity = 'Reorder quantity cannot be negative';
+        }
+
+        if (formData.cost_price === '') {
+            newErrors.cost_price = 'Cost price is required';
+        } else if (parseFloat(formData.cost_price) < 0) {
+            newErrors.cost_price = 'Cost price cannot be negative';
+        }
+
+        if (formData.selling_price === '') {
+            newErrors.selling_price = 'Selling price is required';
+        } else if (parseFloat(formData.selling_price) < 0) {
+            newErrors.selling_price = 'Selling price cannot be negative';
+        }
+
+        if (
+            formData.cost_price !== ''
+            && formData.selling_price !== ''
+            && parseFloat(formData.selling_price) < parseFloat(formData.cost_price)
+        ) {
+            newErrors.selling_price = 'Selling price cannot be less than cost price';
         }
 
         setErrors(newErrors);
@@ -187,7 +223,12 @@ export default function CreateItemModal({
                 console.error('Error creating inventory item:', error);
 
                 if (error.response?.data?.errors) {
-                    setErrors(error.response.data.errors);
+                    const apiErrors = error.response.data.errors as Record<string, string[] | string>;
+                    const flattened: Record<string, string> = {};
+                    Object.entries(apiErrors).forEach(([key, value]) => {
+                        flattened[key] = Array.isArray(value) ? value[0] : value;
+                    });
+                    setErrors(flattened);
                 } else {
                     setErrors({ general: 'Failed to create item. Please try again.' });
                 }
@@ -206,7 +247,9 @@ export default function CreateItemModal({
             uom_id: '',
             quantity: '0',
             reorder_level: '0',
-            unit_price: '',
+            reorder_quantity: '0',
+            cost_price: '',
+            selling_price: '',
             location_id: '',
             is_active: true
         });
@@ -319,6 +362,7 @@ export default function CreateItemModal({
                                     name="category_id"
                                     value={formData.category_id}
                                     onChange={handleChange}
+                                    required
                                     disabled={isSubmitting}
                                     className="w-full py-3 px-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                                 >
@@ -327,6 +371,7 @@ export default function CreateItemModal({
                                         <option key={category.id} value={category.id}>{category.name}</option>
                                     ))}
                                 </select>
+                                {errors.category_id && <p className="text-red-500 text-sm mt-1">{errors.category_id}</p>}
                             </div>
 
                             <div>
@@ -338,6 +383,7 @@ export default function CreateItemModal({
                                     name="uom_id"
                                     value={formData.uom_id}
                                     onChange={handleChange}
+                                    required
                                     disabled={isSubmitting}
                                     className="w-full py-3 px-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                                 >
@@ -348,6 +394,7 @@ export default function CreateItemModal({
                                         </option>
                                     ))}
                                 </select>
+                                {errors.uom_id && <p className="text-red-500 text-sm mt-1">{errors.uom_id}</p>}
                             </div>
 
                             <div>
@@ -416,14 +463,35 @@ export default function CreateItemModal({
                             </div>
 
                             <div>
-                                <Label htmlFor="unit_price" className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Unit Price ($)
+                                <Label htmlFor="reorder_quantity" className="block text-sm font-semibold text-gray-700 mb-2">
+                                    Reorder Quantity
                                 </Label>
                                 <Input
                                     type="number"
-                                    id="unit_price"
-                                    name="unit_price"
-                                    value={formData.unit_price}
+                                    id="reorder_quantity"
+                                    name="reorder_quantity"
+                                    value={formData.reorder_quantity}
+                                    onChange={handleNumberChange}
+                                    min="0"
+                                    step="1"
+                                    disabled={isSubmitting}
+                                    className="py-3 px-4 rounded-xl border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Suggested quantity to reorder when low
+                                </p>
+                                {errors.reorder_quantity && <p className="text-red-500 text-sm mt-1">{errors.reorder_quantity}</p>}
+                            </div>
+
+                            <div>
+                                <Label htmlFor="cost_price" className="block text-sm font-semibold text-gray-700 mb-2">
+                                    Cost Price ($)
+                                </Label>
+                                <Input
+                                    type="number"
+                                    id="cost_price"
+                                    name="cost_price"
+                                    value={formData.cost_price}
                                     onChange={handleNumberChange}
                                     min="0"
                                     step="0.01"
@@ -431,7 +499,26 @@ export default function CreateItemModal({
                                     placeholder="0.00"
                                     className="py-3 px-4 rounded-xl border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                                 />
-                                {errors.unit_price && <p className="text-red-500 text-sm mt-1">{errors.unit_price}</p>}
+                                {errors.cost_price && <p className="text-red-500 text-sm mt-1">{errors.cost_price}</p>}
+                            </div>
+
+                            <div>
+                                <Label htmlFor="selling_price" className="block text-sm font-semibold text-gray-700 mb-2">
+                                    Selling Price ($)
+                                </Label>
+                                <Input
+                                    type="number"
+                                    id="selling_price"
+                                    name="selling_price"
+                                    value={formData.selling_price}
+                                    onChange={handleNumberChange}
+                                    min="0"
+                                    step="0.01"
+                                    disabled={isSubmitting}
+                                    placeholder="0.00"
+                                    className="py-3 px-4 rounded-xl border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                                />
+                                {errors.selling_price && <p className="text-red-500 text-sm mt-1">{errors.selling_price}</p>}
                             </div>
                         </div>
                     </div>

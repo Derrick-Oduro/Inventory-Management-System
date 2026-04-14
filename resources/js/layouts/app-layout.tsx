@@ -1,11 +1,13 @@
 import Sidebar from '@/components/ui/sidebar';
-import { Bell, User, LogOut, Package, MapPin, ClipboardList, Users, Settings, LayoutGrid, Check, X } from 'lucide-react';
+import type { BreadcrumbItem } from '@/types';
+import { Bell, User, LogOut, Package, Users, Settings, LayoutGrid, Truck, ShoppingCart, FileBarChart2 } from 'lucide-react';
 import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { router, usePage, Link } from '@inertiajs/react';
 import axios from 'axios';
 
 type AppLayoutProps = {
     children: ReactNode;
+    breadcrumbs?: BreadcrumbItem[];
 };
 
 type Auth = {
@@ -32,9 +34,10 @@ type Notification = {
 
 const navLinks = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid },
-    { href: '/tickets', label: 'Tickets', icon: ClipboardList },
-    { href: '/inventory', label: 'Inventory', icon: Package },
-    { href: '/requisitions', label: 'Requisitions', icon: ClipboardList },
+    { href: '/inventory', label: 'Products & Stock', icon: Package },
+    { href: '/suppliers', label: 'Suppliers', icon: Truck },
+    { href: '/purchase-orders', label: 'Purchase Orders', icon: ShoppingCart },
+    { href: '/reports', label: 'Reports', icon: FileBarChart2 },
     { href: '/users', label: 'Users', icon: Users, adminOnly: true },
     { href: '/settings', label: 'Settings', icon: Settings },
 ];
@@ -218,14 +221,16 @@ export default function AppLayout({ children }: AppLayoutProps) {
                                                     >
                                                         <div className="flex items-start space-x-3">
                                                             <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
-                                                                notification.data.icon === 'ticket' ? 'bg-blue-100 text-blue-600' :
+                                                                notification.data.icon === 'supplier' ? 'bg-amber-100 text-amber-600' :
+                                                                notification.data.icon === 'purchase_order' ? 'bg-sky-100 text-sky-600' :
+                                                                notification.data.icon === 'report' ? 'bg-indigo-100 text-indigo-600' :
                                                                 notification.data.icon === 'inventory' ? 'bg-green-100 text-green-600' :
-                                                                notification.data.icon === 'requisition' ? 'bg-purple-100 text-purple-600' :
                                                                 'bg-gray-100 text-gray-600'
                                                             }`}>
-                                                                {notification.data.icon === 'ticket' && <ClipboardList className="w-5 h-5" />}
+                                                                {notification.data.icon === 'supplier' && <Truck className="w-5 h-5" />}
+                                                                {notification.data.icon === 'purchase_order' && <ShoppingCart className="w-5 h-5" />}
+                                                                {notification.data.icon === 'report' && <FileBarChart2 className="w-5 h-5" />}
                                                                 {notification.data.icon === 'inventory' && <Package className="w-5 h-5" />}
-                                                                {notification.data.icon === 'requisition' && <ClipboardList className="w-5 h-5" />}
                                                                 {!notification.data.icon && <Bell className="w-5 h-5" />}
                                                             </div>
                                                             <div className="flex-1 min-w-0">

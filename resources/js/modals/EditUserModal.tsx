@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 
 const ROLES = [
     { value: 1, label: 'Admin' },
-    { value: 2, label: 'IT Agent' },
+    { value: 2, label: 'Inventory Manager' },
     { value: 3, label: 'Staff' },
 ];
 

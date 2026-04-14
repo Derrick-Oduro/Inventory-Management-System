@@ -22,14 +22,6 @@ class Location extends Model
     ];
 
     /**
-     * Get the requisitions for this location.
-     */
-    public function requisitions()
-    {
-        return $this->hasMany(Requisition::class);
-    }
-
-    /**
      * Get the user that created this location.
      */
     public function creator()
@@ -43,5 +35,20 @@ class Location extends Model
     public function inventoryItems()
     {
         return $this->hasMany(InventoryItem::class, 'location_id');
+    }
+
+    public function itemStocks()
+    {
+        return $this->hasMany(ItemStock::class, 'location_id');
+    }
+
+    public function sourceMovements()
+    {
+        return $this->hasMany(StockMovement::class, 'from_location_id');
+    }
+
+    public function destinationMovements()
+    {
+        return $this->hasMany(StockMovement::class, 'to_location_id');
     }
 }

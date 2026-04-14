@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use App\Models\User;
 
 class LoginRequest extends FormRequest
 {
@@ -30,7 +29,6 @@ class LoginRequest extends FormRequest
         return [
             'email' => ['required', 'string', 'email'],
             'password' => ['required', 'string'],
-            'role' => ['required', 'string'],
         ];
     }
 
@@ -45,7 +43,7 @@ class LoginRequest extends FormRequest
 
         // First, check if the credentials are valid
         if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
-            RateLimiter::hit($this->throttleKey());
+            RateLimiter::hit($this->throttleKey(), 900);
 
             throw ValidationException::withMessages([
                 'email' => trans('auth.failed'),
@@ -60,17 +58,6 @@ class LoginRequest extends FormRequest
             Auth::logout();
             throw ValidationException::withMessages([
                 'email' => 'Your account has been deactivated. Please contact an administrator.',
-            ]);
-        }
-
-        // Check if the selected role matches the user's actual role
-        $selectedRole = $this->input('role');
-        $userRole = $user->role->name ?? null;
-
-        if ($selectedRole !== $userRole) {
-            Auth::logout();
-            throw ValidationException::withMessages([
-                'role' => "You can only log in with your assigned role: {$userRole}",
             ]);
         }
 

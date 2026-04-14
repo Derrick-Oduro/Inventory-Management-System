@@ -123,11 +123,11 @@ export default function Users() {
 
     // Get badge color based on role
     const getRoleBadge = (roleName?: string, isActive: boolean = true) => {
-        const baseClasses = "inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full shadow-sm";
+        const baseClasses = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium';
 
         if (!isActive) {
             return (
-                <span className={`${baseClasses} bg-gray-200 text-gray-600`}>
+                <span className={`${baseClasses} bg-slate-200 text-slate-600`}>
                     <User className="h-3 w-3" />
                     {roleName || 'N/A'} (Inactive)
                 </span>
@@ -137,28 +137,28 @@ export default function Users() {
         switch (roleName?.toLowerCase()) {
             case 'admin':
                 return (
-                    <span className={`${baseClasses} bg-gradient-to-r from-purple-500 to-purple-600 text-white`}>
+                    <span className={`${baseClasses} bg-purple-100 text-purple-700`}>
                         <Shield className="h-3 w-3" />
                         Admin
                     </span>
                 );
-            case 'it agent':
+            case 'inventory manager':
                 return (
-                    <span className={`${baseClasses} bg-gradient-to-r from-blue-500 to-blue-600 text-white`}>
+                    <span className={`${baseClasses} bg-blue-100 text-blue-700`}>
                         <User className="h-3 w-3" />
-                        IT Agent
+                        Inventory Manager
                     </span>
                 );
             case 'staff':
                 return (
-                    <span className={`${baseClasses} bg-gradient-to-r from-green-500 to-green-600 text-white`}>
+                    <span className={`${baseClasses} bg-emerald-100 text-emerald-700`}>
                         <User className="h-3 w-3" />
                         Staff
                     </span>
                 );
             default:
                 return (
-                    <span className={`${baseClasses} bg-gray-100 text-gray-800`}>
+                    <span className={`${baseClasses} bg-slate-100 text-slate-700`}>
                         {roleName || 'N/A'}
                     </span>
                 );
@@ -179,62 +179,62 @@ export default function Users() {
     const getUserStats = () => {
         const total = filteredUsers.length;
         const admins = filteredUsers.filter(user => user.role?.name?.toLowerCase() === 'admin').length;
-        const agents = filteredUsers.filter(user => user.role?.name?.toLowerCase() === 'it agent').length;
+        const managers = filteredUsers.filter(user => user.role?.name?.toLowerCase() === 'inventory manager').length;
         const staff = filteredUsers.filter(user => user.role?.name?.toLowerCase() === 'staff').length;
-        return { total, admins, agents, staff };
+        return { total, admins, managers, staff };
     };
 
     const stats = getUserStats();
 
     // Get unique roles for filter
-    const uniqueRoles = Array.from(new Set(users.map(user => user.role?.name?.toLowerCase()).filter(Boolean)));
+    const uniqueRoles = Array.from(
+        new Set(users.map(user => user.role?.name?.toLowerCase()).filter((role): role is string => Boolean(role)))
+    );
 
     return (
         <AppLayout>
             <Head title="Users" />
 
             {/* Header Section */}
-            <div className="mb-8">
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            <div className="mb-4">
+                <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
                     <div>
-                        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent mb-2">
-                            User Management
-                        </h1>
-                        <p className="text-gray-600">Manage system users and their roles</p>
+                        <h1 className="text-2xl font-semibold text-slate-900">Users</h1>
+                        <p className="text-sm text-slate-600">Manage system users and their roles</p>
                     </div>
 
                     <button
                         onClick={handleAddUser}
-                        className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+                        className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white"
                     >
-                        <UserPlus className="h-5 w-5" />
+                        <UserPlus className="h-4 w-4" />
                         Add User
                     </button>
                 </div>
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
                 <StatCard
-                    icon={<UsersIcon className="w-6 h-6" />}
+                    icon={<UsersIcon className="h-5 w-5" />}
                     label="Total Users"
                     value={stats.total}
                     color="blue"
                 />
                 <StatCard
-                    icon={<Shield className="w-6 h-6" />}
+                    icon={<Shield className="h-5 w-5" />}
                     label="Administrators"
                     value={stats.admins}
                     color="purple"
                 />
                 <StatCard
-                    icon={<User className="w-6 h-6" />}
-                    label="IT Agents"
-                    value={stats.agents}
+                    icon={<User className="h-5 w-5" />}
+                    label="Inventory Managers"
+                    value={stats.managers}
                     color="indigo"
                 />
                 <StatCard
-                    icon={<User className="w-6 h-6" />}
+                    icon={<User className="h-5 w-5" />}
                     label="Staff Members"
                     value={stats.staff}
                     color="green"
@@ -242,17 +242,17 @@ export default function Users() {
             </div>
 
             {/* Search and Filters */}
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-8">
-                <div className="flex flex-col lg:flex-row gap-4">
+            <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4">
+                <div className="flex flex-col gap-3 lg:flex-row">
                     {/* Search Bar */}
                     <div className="flex-1">
                         <div className="relative">
-                            <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
-                                <Search className="h-5 w-5 text-gray-400" />
+                            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                <Search className="h-4 w-4 text-slate-400" />
                             </div>
                             <input
                                 type="text"
-                                className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-gray-900 placeholder-gray-500"
+                                className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm text-slate-900 placeholder-slate-500"
                                 placeholder="Search by name, email, or role..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -263,10 +263,10 @@ export default function Users() {
                     {/* Filter Toggle */}
                     <button
                         onClick={() => setShowFilters(!showFilters)}
-                        className={`flex items-center gap-2 px-4 py-3 rounded-xl font-medium transition-all duration-200 ${
+                        className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
                             showFilters
-                                ? 'bg-blue-100 text-blue-700 border border-blue-200'
-                                : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
+                                ? 'border-blue-200 bg-blue-50 text-blue-700'
+                                : 'border-slate-300 text-slate-700 hover:bg-slate-50'
                         }`}
                     >
                         <Filter className="h-4 w-4" />
@@ -277,7 +277,7 @@ export default function Users() {
                     {/* Refresh Button */}
                     <button
                         onClick={fetchUsers}
-                        className="flex items-center gap-2 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl border border-gray-200 transition-all duration-200"
+                        className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                         disabled={isLoading}
                     >
                         <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
@@ -287,19 +287,19 @@ export default function Users() {
 
                 {/* Expandable Filters */}
                 {showFilters && (
-                    <div className="mt-6 pt-6 border-t border-gray-200">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="mt-4 border-t border-slate-200 pt-4">
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
+                                <label className="mb-1 block text-xs font-medium text-slate-700">Role</label>
                                 <select
-                                    className="w-full py-3 px-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                                     value={roleFilter}
                                     onChange={(e) => setRoleFilter(e.target.value)}
                                 >
                                     <option value="all">All Roles</option>
                                     {uniqueRoles.map(role => (
                                         <option key={role} value={role}>
-                                            {role?.charAt(0).toUpperCase() + role?.slice(1)}
+                                            {role.charAt(0).toUpperCase() + role.slice(1)}
                                         </option>
                                     ))}
                                 </select>
@@ -310,27 +310,27 @@ export default function Users() {
             </div>
 
             {/* Users Table */}
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
                 {isLoading ? (
-                    <div className="flex justify-center items-center h-64">
+                    <div className="flex h-40 items-center justify-center">
                         <div className="flex items-center gap-3">
                             <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
-                            <span className="text-gray-600 font-medium">Loading users...</span>
+                            <span className="text-sm text-slate-600">Loading users...</span>
                         </div>
                     </div>
                 ) : filteredUsers.length === 0 ? (
-                    <div className="flex flex-col justify-center items-center h-64">
-                        <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-full p-6 mb-4">
-                            <UsersIcon className="h-16 w-16 text-gray-400" />
+                    <div className="flex h-40 flex-col items-center justify-center">
+                        <div className="mb-3 rounded-full bg-slate-100 p-4">
+                            <UsersIcon className="h-8 w-8 text-slate-400" />
                         </div>
-                        <h3 className="text-xl font-semibold text-gray-800 mb-2">No users found</h3>
-                        <p className="text-gray-500 mb-4">
+                        <h3 className="mb-1 text-base font-semibold text-slate-800">No users found</h3>
+                        <p className="mb-3 text-sm text-slate-500">
                             {searchQuery ? 'Try adjusting your search terms' : 'Get started by adding your first user'}
                         </p>
                         {searchQuery && (
                             <button
                                 onClick={() => setSearchQuery('')}
-                                className="text-blue-600 hover:text-blue-700 font-medium"
+                                className="text-sm font-medium text-blue-600 hover:text-blue-700"
                             >
                                 Clear search
                             </button>
@@ -338,7 +338,7 @@ export default function Users() {
                         {!searchQuery && (
                             <button
                                 onClick={handleAddUser}
-                                className="mt-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+                                className="mt-2 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white"
                             >
                                 <UserPlus className="h-4 w-4" />
                                 Add your first user
@@ -347,103 +347,103 @@ export default function Users() {
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="min-w-full">
-                            <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+                        <table className="min-w-full text-sm">
+                            <thead className="bg-slate-50">
                                 <tr>
-                                    <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                    <th scope="col" className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                                         User
                                     </th>
-                                    <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                    <th scope="col" className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                                         Email
                                     </th>
-                                    <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                    <th scope="col" className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                                         Role
                                     </th>
-                                    <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                    <th scope="col" className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                                         Member Since
                                     </th>
-                                    <th scope="col" className="px-6 py-4 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                    <th scope="col" className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">
                                         Actions
                                     </th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100">
+                            <tbody className="divide-y divide-slate-100">
                                 {filteredUsers.map((user) => (
                                     <tr
                                         key={user.id}
-                                        className={`transition-colors duration-200 ${
+                                        className={`transition-colors ${
                                             user.is_active === false
-                                                ? 'bg-red-50 hover:bg-red-100'
-                                                : 'hover:bg-gray-50'
+                                                ? 'bg-red-50/60 hover:bg-red-100/60'
+                                                : 'hover:bg-slate-50'
                                         }`}
                                     >
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-4">
-                                                <div className={`h-12 w-12 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg ${
+                                        <td className="px-3 py-2.5">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold text-white ${
                                                     user.is_active === false
-                                                        ? 'bg-gradient-to-br from-gray-400 to-gray-500'
-                                                        : 'bg-gradient-to-br from-blue-500 to-blue-600'
+                                                        ? 'bg-slate-400'
+                                                        : 'bg-blue-600'
                                                 }`}>
                                                     {user.name.charAt(0).toUpperCase()}
                                                 </div>
                                                 <div>
-                                                    <div className={`font-semibold text-lg flex items-center gap-2 ${
-                                                        user.is_active === false ? 'text-gray-500' : 'text-gray-900'
+                                                    <div className={`flex items-center gap-2 text-sm font-medium ${
+                                                        user.is_active === false ? 'text-slate-500' : 'text-slate-900'
                                                     }`}>
                                                         {user.name}
                                                         {user.is_active === false && (
-                                                            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                                                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
                                                                 Inactive
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <div className="text-sm text-gray-500">
+                                                    <div className="text-xs text-slate-500">
                                                         ID: #{user.id}
                                                     </div>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4">
+                                        <td className="px-3 py-2.5">
                                             <div className="flex items-center gap-2">
-                                                <Mail className="h-4 w-4 text-gray-400" />
-                                                <span className={`font-medium ${
-                                                    user.is_active === false ? 'text-gray-500' : 'text-gray-900'
+                                                <Mail className="h-4 w-4 text-slate-400" />
+                                                <span className={`text-sm ${
+                                                    user.is_active === false ? 'text-slate-500' : 'text-slate-900'
                                                 }`}>
                                                     {user.email}
                                                 </span>
                                             </div>
                                             {user.email_verified_at && (
-                                                <div className="text-xs text-green-600 mt-1">✓ Verified</div>
+                                                <div className="mt-0.5 text-xs text-emerald-600">Verified</div>
                                             )}
                                         </td>
-                                        <td className="px-6 py-4">
+                                        <td className="px-3 py-2.5">
                                             {getRoleBadge(user.role?.name, user.is_active)}
                                         </td>
-                                        <td className="px-6 py-4">
+                                        <td className="px-3 py-2.5">
                                             <div className={`font-medium ${
-                                                user.is_active === false ? 'text-gray-500' : 'text-gray-900'
+                                                user.is_active === false ? 'text-slate-500' : 'text-slate-900'
                                             }`}>
                                                 {formatDate(user.created_at)}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4">
+                                        <td className="px-3 py-2.5">
                                             <div className="flex justify-end space-x-2">
                                                 <button
-                                                    className="p-2 text-indigo-600 hover:text-indigo-900 hover:bg-indigo-50 rounded-xl transition-all duration-200"
+                                                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-indigo-600 hover:bg-indigo-50 hover:text-indigo-900"
                                                     onClick={() => handleViewDetails(user)}
                                                     title="View Details"
                                                 >
-                                                    <Eye className="h-5 w-5" />
+                                                    <Eye className="h-4 w-4" />
                                                 </button>
                                                 <button
-                                                    className="p-2 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-xl transition-all duration-200"
+                                                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-blue-600 hover:bg-blue-50 hover:text-blue-900"
                                                     onClick={() => handleEdit(user)}
                                                     title="Edit User"
                                                 >
-                                                    <Edit2 className="h-5 w-5" />
+                                                    <Edit2 className="h-4 w-4" />
                                                 </button>
                                                 <button
-                                                    className={`p-2 rounded-xl transition-all duration-200 ${
+                                                    className={`inline-flex h-8 w-8 items-center justify-center rounded-md ${
                                                         user.is_active === false
                                                             ? 'text-green-600 hover:text-green-900 hover:bg-green-50'
                                                             : 'text-red-600 hover:text-red-900 hover:bg-red-50'
@@ -452,11 +452,11 @@ export default function Users() {
                                                     title={user.is_active === false ? 'Activate User' : 'Deactivate User'}
                                                 >
                                                     {user.is_active === false ? (
-                                                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                         </svg>
                                                     ) : (
-                                                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636" />
                                                         </svg>
                                                     )}
@@ -493,11 +493,11 @@ export default function Users() {
                     onClick={() => setShowDetailModal(false)}
                 >
                     <div
-                        className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg relative m-4"
+                        className="relative m-4 w-full max-w-md rounded-xl bg-white p-6 shadow-2xl"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <button
-                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-xl transition-all duration-200"
+                            className="absolute right-3 top-3 rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                             onClick={() => setShowDetailModal(false)}
                         >
                             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -505,56 +505,56 @@ export default function Users() {
                             </svg>
                         </button>
 
-                        <div className="flex items-center gap-4 mb-6">
-                            <div className="h-16 w-16 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-2xl shadow-lg">
+                        <div className="mb-5 flex items-center gap-3">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-xl font-semibold text-white">
                                 {selectedUser.name.charAt(0).toUpperCase()}
                             </div>
                             <div>
-                                <h2 className="text-2xl font-bold text-gray-900">{selectedUser.name}</h2>
-                                <p className="text-gray-600">User ID: #{selectedUser.id}</p>
+                                <h2 className="text-xl font-semibold text-slate-900">{selectedUser.name}</h2>
+                                <p className="text-sm text-slate-600">User ID: #{selectedUser.id}</p>
                             </div>
                         </div>
 
-                        <div className="space-y-4">
-                            <div className="bg-gray-50 rounded-xl p-4">
-                                <h3 className="font-semibold text-gray-900 mb-2">Contact Information</h3>
+                        <div className="space-y-3">
+                            <div className="rounded-lg border border-slate-200 p-3">
+                                <h3 className="mb-2 text-sm font-semibold text-slate-900">Contact Information</h3>
                                 <div className="flex items-center gap-2">
-                                    <Mail className="h-4 w-4 text-gray-400" />
-                                    <span className="text-gray-900">{selectedUser.email}</span>
+                                    <Mail className="h-4 w-4 text-slate-400" />
+                                    <span className="text-sm text-slate-900">{selectedUser.email}</span>
                                 </div>
                                 {selectedUser.email_verified_at && (
-                                    <div className="text-xs text-green-600 mt-1">✓ Email verified</div>
+                                    <div className="mt-1 text-xs text-emerald-600">Email verified</div>
                                 )}
                             </div>
 
-                            <div className="bg-gray-50 rounded-xl p-4">
-                                <h3 className="font-semibold text-gray-900 mb-2">Role & Permissions</h3>
+                            <div className="rounded-lg border border-slate-200 p-3">
+                                <h3 className="mb-2 text-sm font-semibold text-slate-900">Role & Permissions</h3>
                                 {getRoleBadge(selectedUser.role?.name, selectedUser.is_active)}
                             </div>
 
-                            <div className="bg-gray-50 rounded-xl p-4">
-                                <h3 className="font-semibold text-gray-900 mb-2">Account Details</h3>
-                                <div className="space-y-1">
-                                    <div className="text-sm text-gray-600">
+                            <div className="rounded-lg border border-slate-200 p-3">
+                                <h3 className="mb-2 text-sm font-semibold text-slate-900">Account Details</h3>
+                                <div>
+                                    <div className="text-sm text-slate-600">
                                         <span className="font-medium">Member since:</span> {formatDate(selectedUser.created_at)}
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="flex justify-end gap-3 mt-6">
+                        <div className="mt-5 flex justify-end gap-2">
                             <button
                                 onClick={() => {
                                     setShowDetailModal(false);
                                     handleEdit(selectedUser);
                                 }}
-                                className="px-4 py-2 bg-blue-100 text-blue-700 font-semibold rounded-xl hover:bg-blue-200 transition-all duration-200"
+                                className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100"
                             >
                                 Edit User
                             </button>
                             <button
                                 onClick={() => setShowDetailModal(false)}
-                                className="px-4 py-2 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-all duration-200"
+                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                             >
                                 Close
                             </button>
@@ -578,21 +578,21 @@ function StatCard({
     color: string;
 }) {
     const colorClasses = {
-        blue: 'bg-gradient-to-br from-blue-500 to-blue-600',
-        purple: 'bg-gradient-to-br from-purple-500 to-purple-600',
-        indigo: 'bg-gradient-to-br from-indigo-500 to-indigo-600',
-        green: 'bg-gradient-to-br from-green-500 to-green-600',
+        blue: 'bg-blue-100 text-blue-700',
+        purple: 'bg-purple-100 text-purple-700',
+        indigo: 'bg-indigo-100 text-indigo-700',
+        green: 'bg-emerald-100 text-emerald-700',
     }[color];
 
     return (
-        <div className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 border border-gray-100">
-            <div className="flex items-center justify-between mb-4">
-                <div className={`${colorClasses} text-white rounded-xl p-3 shadow-lg`}>
+        <div className="rounded-xl border border-slate-200 bg-white p-3">
+            <div className="flex items-center justify-between">
+                <div className={`${colorClasses} rounded-lg p-2`}>
                     {icon}
                 </div>
             </div>
-            <div className="text-3xl font-bold text-gray-800 mb-1">{value}</div>
-            <div className="text-gray-600 font-medium">{label}</div>
+            <div className="mt-2 text-xl font-semibold text-slate-900">{value}</div>
+            <div className="text-xs text-slate-500">{label}</div>
         </div>
     );
 }

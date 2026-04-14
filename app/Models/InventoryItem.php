@@ -18,6 +18,9 @@ class InventoryItem extends Model
         'location_id',
         'quantity',
         'reorder_level',
+        'reorder_quantity',
+        'cost_price',
+        'selling_price',
         'unit_price',
         'is_active',
         'image_path',
@@ -28,6 +31,9 @@ class InventoryItem extends Model
     protected $casts = [
         'quantity' => 'decimal:2',
         'reorder_level' => 'decimal:2',
+        'reorder_quantity' => 'decimal:2',
+        'cost_price' => 'decimal:2',
+        'selling_price' => 'decimal:2',
         'unit_price' => 'decimal:2',
         'is_active' => 'boolean'
     ];
@@ -54,11 +60,28 @@ class InventoryItem extends Model
 
     public function transactions()
     {
-        return $this->hasMany(InventoryTransaction::class, 'item_id');
+        return $this->hasMany(StockMovement::class, 'item_id');
     }
 
     public function location()
     {
         return $this->belongsTo(Location::class, 'location_id');
+    }
+
+    public function stocks()
+    {
+        return $this->hasMany(ItemStock::class, 'item_id');
+    }
+
+    public function suppliers()
+    {
+        return $this->belongsToMany(Supplier::class, 'inventory_item_supplier', 'item_id', 'supplier_id')
+            ->withPivot(['is_preferred', 'supplier_sku', 'last_purchase_price'])
+            ->withTimestamps();
+    }
+
+    public function purchaseOrderItems()
+    {
+        return $this->hasMany(PurchaseOrderItem::class, 'item_id');
     }
 }

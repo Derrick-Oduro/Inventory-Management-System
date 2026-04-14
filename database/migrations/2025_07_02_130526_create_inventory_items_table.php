@@ -16,7 +16,7 @@ return new class extends Migration {
             $table->string('name');
             $table->string('sku')->unique();
             $table->text('description')->nullable();
-            $table->foreignId('category_id')->nullable()->constrained('item_categories')->nullOnDelete();
+            $table->unsignedBigInteger('category_id')->nullable();
             $table->foreignId('uom_id')->nullable()->constrained('units_of_measure')->nullOnDelete();
             $table->decimal('quantity', 10, 2)->default(0);
             $table->decimal('reorder_level', 10, 2)->default(0);

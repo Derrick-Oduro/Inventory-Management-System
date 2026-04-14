@@ -12,17 +12,15 @@ return new class extends Migration {
     {
         Schema::create('requisitions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('requested_by')->constrained('users');
-            $table->foreignId('item_id')->constrained('inventory_items');
+            $table->unsignedBigInteger('requested_by');
+            $table->unsignedBigInteger('item_id');
             $table->integer('quantity');
             $table->enum('status', ['pending', 'approved', 'declined'])->default('pending');
-            $table->foreignId('location_id')->constrained('locations');
+            $table->unsignedBigInteger('location_id');
             $table->unsignedBigInteger('reviewed_by')->nullable();
             $table->timestamp('reviewed_at')->nullable();
             $table->timestamps();
             $table->text('admin_notes')->nullable();
-
-            $table->foreign('reviewed_by')->references('id')->on('users')->onDelete('set null');
         });
 
     }
