@@ -1,0 +1,16 @@
+export default function AppLogo() {
+    return (
+        <>
+            <div className="flex aspect-square size-8 items-center justify-center rounded-md overflow-hidden">
+                <img
+                    src="/images/company-logo.jpg"
+                    alt="Company Logo"
+                    className="size-8 object-cover rounded-md"
+                />
+            </div>
+            <div className="ml-1 grid flex-1 text-left text-sm">
+                <span className="mb-0.5 truncate leading-tight font-semibold">IT Support System</span>
+            </div>
+        </>
+    );
+}
