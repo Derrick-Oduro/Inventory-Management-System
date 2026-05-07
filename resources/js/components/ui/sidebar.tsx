@@ -37,27 +37,27 @@ export default function Sidebar({ className, navLinks, user }: SidebarProps) {
     }, []);
 
     return (
-        <aside className={`bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 text-white shadow-2xl ${className}`}>
+        <aside className={`bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white shadow-2xl ${className}`}>
             {/* Header with Logo */}
-            <div className="p-6 border-b border-white/20">
+            <div className="border-b border-white/10 p-6">
                 <div className="flex items-center space-x-3">
                     <div className="relative">
                         <img
                             src="/images/company-logo.jpg"
                             alt="Company Logo"
-                            className="h-12 w-12 object-contain rounded-xl shadow-lg"
+                            className="h-12 w-12 rounded-xl object-contain shadow-lg ring-1 ring-white/10"
                         />
-                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white"></div>
+                        <div className="absolute -right-1 -top-1 h-4 w-4 rounded-full border-2 border-slate-900 bg-emerald-400"></div>
                     </div>
                     <div>
                         <div className="text-xl font-bold tracking-wide">Inventory</div>
-                        <div className="text-xs text-blue-100 opacity-90">Management System</div>
+                        <div className="text-xs text-slate-300">Management System</div>
                     </div>
                 </div>
             </div>
 
             {/* Navigation */}
-            <nav className="mt-8 px-4 flex-1">
+            <nav className="mt-8 flex-1 px-4">
                 <ul className="space-y-2">
                     {navLinks.map((link) => {
                         const isActive = url.startsWith(link.href);
@@ -67,8 +67,8 @@ export default function Sidebar({ className, navLinks, user }: SidebarProps) {
                                     href={link.href}
                                     className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
                                         isActive
-                                            ? 'bg-white/20 text-white shadow-lg backdrop-blur-sm border border-white/30'
-                                            : 'hover:bg-white/10 text-blue-100 hover:text-white'
+                                            ? 'border border-white/10 bg-white/10 text-white shadow-lg backdrop-blur-sm'
+                                            : 'text-slate-300 hover:bg-white/5 hover:text-white'
                                     }`}
                                 >
                                     <link.icon className={`w-5 h-5 transition-transform duration-200 ${
@@ -86,11 +86,11 @@ export default function Sidebar({ className, navLinks, user }: SidebarProps) {
             </nav>
 
             {/* Decorative Elements */}
-            <div className="absolute top-20 right-4 w-20 h-20 bg-white/5 rounded-full"></div>
-            <div className="absolute bottom-40 left-4 w-12 h-12 bg-white/5 rounded-full"></div>
+            <div className="absolute right-4 top-20 h-20 w-20 rounded-full bg-white/5"></div>
+            <div className="absolute bottom-40 left-4 h-12 w-12 rounded-full bg-white/5"></div>
 
             {/* User Profile Section - Adjusted for better fit */}
-            <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-white/20 bg-gradient-to-r from-blue-800/50 to-blue-900/50 backdrop-blur-sm">
+            <div className="absolute bottom-0 left-0 right-0 border-t border-white/10 bg-slate-950/80 p-3 backdrop-blur-sm">
                 <div className="relative" ref={profileRef}>
                     <button
                         onClick={() => setProfileOpen(!profileOpen)}
@@ -103,7 +103,7 @@ export default function Sidebar({ className, navLinks, user }: SidebarProps) {
                                 className="w-9 h-9 rounded-full border-2 border-white/30 object-cover flex-shrink-0"
                             />
                         ) : (
-                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 text-white flex items-center justify-center font-bold border-2 border-white/30 shadow-lg flex-shrink-0 text-sm">
+                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-slate-500 to-slate-700 text-white flex items-center justify-center font-bold border-2 border-white/10 shadow-lg flex-shrink-0 text-sm">
                                 {user.name
                                     .split(' ')
                                     .map((n) => n[0])
@@ -115,11 +115,11 @@ export default function Sidebar({ className, navLinks, user }: SidebarProps) {
                         <div className="flex-1 text-left min-w-0">
                             <div className="font-semibold text-white truncate text-sm">{user.name}</div>
                             <div className="flex items-center justify-between">
-                                <div className="text-xs text-blue-200 truncate flex-1 mr-1">{user.email}</div>
+                                <div className="text-xs text-slate-300 truncate flex-1 mr-1">{user.email}</div>
                                 <div className={`px-1.5 py-0.5 rounded text-xs font-medium flex-shrink-0 ${
-                                    user.role?.name === 'Admin' ? 'bg-yellow-400/20 text-yellow-300' :
-                                    user.role?.name === 'Inventory Manager' ? 'bg-green-400/20 text-green-300' :
-                                    'bg-gray-400/20 text-gray-300'
+                                    user.role?.name === 'Admin' ? 'bg-amber-400/20 text-amber-200' :
+                                    user.role?.name === 'Inventory Manager' ? 'bg-emerald-400/20 text-emerald-200' :
+                                    'bg-white/10 text-slate-300'
                                 }`}>
                                     {user.role?.name || 'Staff'}
                                 </div>
@@ -129,23 +129,23 @@ export default function Sidebar({ className, navLinks, user }: SidebarProps) {
 
                     {/* Profile Dropdown */}
                     {profileOpen && (
-                        <div className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
-                            <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100">
+                        <div className="absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
+                            <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-4">
                                 <div className="flex items-center space-x-3">
-                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 text-white flex items-center justify-center font-bold">
+                                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-slate-700 to-slate-900 font-bold text-white">
                                         <User className="w-6 h-6" />
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                        <div className="font-semibold text-gray-800 truncate">{user.name}</div>
-                                        <div className="text-sm text-gray-600 truncate">{user.email}</div>
-                                        <div className="text-xs text-blue-600 font-medium">{user.role?.name || 'Staff'}</div>
+                                        <div className="truncate font-semibold text-slate-800">{user.name}</div>
+                                        <div className="truncate text-sm text-slate-600">{user.email}</div>
+                                        <div className="text-xs font-medium text-slate-700">{user.role?.name || 'Staff'}</div>
                                     </div>
                                 </div>
                             </div>
                             <div className="p-2">
                                 <button
                                     onClick={() => router.post('/logout')}
-                                    className="w-full text-left px-3 py-2 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition-colors flex items-center gap-2 font-medium"
+                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-medium text-rose-700 transition-colors hover:bg-rose-50"
                                 >
                                     <LogOut className="w-4 h-4" />
                                     Sign Out
