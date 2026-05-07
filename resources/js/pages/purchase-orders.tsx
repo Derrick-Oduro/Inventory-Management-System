@@ -29,6 +29,7 @@ export default function PurchaseOrdersPage() {
     const [orders, setOrders] = useState<PurchaseOrder[]>([]);
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [lowStockItems, setLowStockItems] = useState<LowStockItem[]>([]);
+    const [inventoryItems, setInventoryItems] = useState<Array<{ id: number; name: string; sku: string; reorder_quantity?: number; cost_price?: number }>>([]);
     const [loading, setLoading] = useState(true);
 
     const [form, setForm] = useState({
@@ -43,15 +44,17 @@ export default function PurchaseOrdersPage() {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [ordersResponse, suppliersResponse, suggestionsResponse] = await Promise.all([
+            const [ordersResponse, suppliersResponse, suggestionsResponse, itemsResponse] = await Promise.all([
                 axios.get('/api/purchase-orders'),
-                axios.get('/api/suppliers'),
+                axios.get('/api/suppliers', { params: { active: true } }),
                 axios.get('/api/purchase-orders/suggestions/low-stock'),
+                axios.get('/api/inventory/items'),
             ]);
 
             setOrders(ordersResponse.data);
             setSuppliers(suppliersResponse.data);
             setLowStockItems(suggestionsResponse.data);
+            setInventoryItems(itemsResponse.data.items || []);
         } catch (error) {
             console.error('Failed to fetch PO data:', error);
         } finally {
@@ -116,6 +119,8 @@ export default function PurchaseOrdersPage() {
         }
     };
 
+    const currency = 'GHS';
+
     return (
         <AppLayout>
             <Head title="Purchase Orders" />
@@ -149,7 +154,7 @@ export default function PurchaseOrdersPage() {
                             value={form.item_id}
                             onChange={(e) => {
                                 const selectedId = Number(e.target.value);
-                                const selectedItem = lowStockItems.find((item) => item.id === selectedId);
+                                const selectedItem = inventoryItems.find((item) => item.id === selectedId) || lowStockItems.find((item) => item.id === selectedId);
                                 setForm((prev) => ({
                                     ...prev,
                                     item_id: e.target.value,
@@ -160,12 +165,36 @@ export default function PurchaseOrdersPage() {
                             required
                         >
                             <option value="">Select product</option>
-                            {lowStockItems.map((item) => (
+                            {inventoryItems.map((item) => (
                                 <option key={item.id} value={item.id}>
                                     {item.name} ({item.sku})
                                 </option>
                             ))}
                         </select>
+
+                        {/* Quick suggestions for low-stock items */}
+                        {lowStockItems.length > 0 && (
+                            <div className="md:col-span-3">
+                                <p className="text-sm text-slate-600">Suggested items (low stock):</p>
+                                <div className="flex flex-wrap gap-2 mt-2">
+                                    {lowStockItems.map((sugg) => (
+                                        <button
+                                            key={sugg.id}
+                                            type="button"
+                                            className="rounded border border-slate-300 px-3 py-1 text-sm"
+                                            onClick={() => setForm((prev) => ({
+                                                ...prev,
+                                                item_id: String(sugg.id),
+                                                quantity: String(sugg.reorder_quantity ?? prev.quantity),
+                                                unit_price: String(sugg.cost_price ?? prev.unit_price),
+                                            }))}
+                                        >
+                                            {sugg.name}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         <input
                             className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
@@ -194,6 +223,7 @@ export default function PurchaseOrdersPage() {
                             type="date"
                             value={form.expected_delivery_date}
                             onChange={(e) => setForm((prev) => ({ ...prev, expected_delivery_date: e.target.value }))}
+                            required
                         />
 
                         <input
@@ -236,9 +266,9 @@ export default function PurchaseOrdersPage() {
                                             <td className="px-2 py-2 text-slate-600">{order.supplier?.company_name || '-'}</td>
                                             <td className="px-2 py-2 text-slate-600">{order.status}</td>
                                             <td className="px-2 py-2 text-slate-600">
-                                                {Number(order.total_amount).toLocaleString(undefined, {
+                                                {Number(order.total_amount).toLocaleString('en-GH', {
                                                     style: 'currency',
-                                                    currency: 'USD',
+                                                    currency,
                                                 })}
                                             </td>
                                             <td className="px-2 py-2 text-slate-600">

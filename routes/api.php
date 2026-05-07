@@ -54,6 +54,7 @@ Route::middleware(['web', 'auth', 'active.user'])->group(function () {
     Route::get('/suppliers/{id}', [SupplierController::class, 'show']);
     Route::post('/suppliers', [SupplierController::class, 'store']);
     Route::put('/suppliers/{id}', [SupplierController::class, 'update']);
+    Route::patch('/suppliers/{id}/activate', [SupplierController::class, 'activate']);
     Route::patch('/suppliers/{id}/deactivate', [SupplierController::class, 'deactivate']);
     Route::put('/suppliers/{id}/items', [SupplierController::class, 'syncItems']);
 

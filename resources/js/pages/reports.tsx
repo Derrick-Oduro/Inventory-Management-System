@@ -106,8 +106,8 @@ export default function ReportsPage() {
                                             <td className="px-2 py-2">{row.sku}</td>
                                             <td className="px-2 py-2">{row.location}</td>
                                             <td className="px-2 py-2">{row.quantity}</td>
-                                            <td className="px-2 py-2">{row.cost_price}</td>
-                                            <td className="px-2 py-2">{row.total_value}</td>
+                                            <td className="px-2 py-2">{Number(row.cost_price ?? 0).toLocaleString('en-GH', { style: 'currency', currency: 'GHS' })}</td>
+                                            <td className="px-2 py-2">{Number(row.total_value ?? 0).toLocaleString('en-GH', { style: 'currency', currency: 'GHS' })}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -170,7 +170,7 @@ export default function ReportsPage() {
                                             <td className="px-2 py-2">{row.po_number}</td>
                                             <td className="px-2 py-2">{row.supplier?.company_name || '-'}</td>
                                             <td className="px-2 py-2">{row.status}</td>
-                                            <td className="px-2 py-2">{row.total_amount}</td>
+                                            <td className="px-2 py-2">{Number(row.total_amount ?? 0).toLocaleString('en-GH', { style: 'currency', currency: 'GHS' })}</td>
                                             <td className="px-2 py-2">{new Date(row.created_at).toLocaleDateString()}</td>
                                         </tr>
                                     ))}

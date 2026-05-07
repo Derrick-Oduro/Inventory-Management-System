@@ -86,6 +86,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Application Currency
+    |--------------------------------------------------------------------------
+    |
+    | Default currency used across the UI for formatting monetary values.
+    | Can be overridden via the APP_CURRENCY environment variable. Also
+    | expose a small list of available currencies for dropdowns.
+    |
+    */
+    'currency' => env('APP_CURRENCY', 'GHS'),
+
+    'available_currencies' => [
+        'GHS',
+        'USD',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Encryption Key
     |--------------------------------------------------------------------------
     |

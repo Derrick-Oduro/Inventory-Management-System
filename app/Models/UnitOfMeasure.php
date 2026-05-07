@@ -1,5 +1,4 @@
 <?php
-// filepath: /home/derrick/Development/it-support-system/app/Models/UnitOfMeasure.php
 
 namespace App\Models;
 

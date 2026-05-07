@@ -30,7 +30,7 @@ services:
       - key: DB_PASSWORD
         value: your-password
       - key: FRONTEND_URL
-        value: https://it-support-system.onrender.com
+        value: https://inventory-management-system.onrender.com
 
   # === React Frontend ===
   - type: web

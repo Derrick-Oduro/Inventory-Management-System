@@ -158,6 +158,7 @@ export default function SuppliersPage() {
                                         <th className="px-2 py-2">Terms</th>
                                         <th className="px-2 py-2">Lead Time</th>
                                         <th className="px-2 py-2">Products</th>
+                                        <th className="px-2 py-2">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -169,6 +170,44 @@ export default function SuppliersPage() {
                                             <td className="px-2 py-2 text-slate-600">{supplier.payment_terms || '-'}</td>
                                             <td className="px-2 py-2 text-slate-600">{supplier.expected_delivery_days} days</td>
                                             <td className="px-2 py-2 text-slate-600">{supplier.items_count ?? 0}</td>
+                                            <td className="px-2 py-2">
+                                                <div className="flex gap-2">
+                                                    {supplier.is_active ? (
+                                                        <button
+                                                            className="rounded border border-rose-300 px-2 py-1 text-xs text-rose-700"
+                                                            onClick={async () => {
+                                                                if (!confirm(`Deactivate ${supplier.company_name}?`)) return;
+                                                                try {
+                                                                    await axios.patch(`/api/suppliers/${supplier.id}/deactivate`);
+                                                                    fetchSuppliers();
+                                                                } catch (err) {
+                                                                    console.error('Failed to deactivate supplier', err);
+                                                                }
+                                                            }}
+                                                        >
+                                                            Deactivate
+                                                        </button>
+                                                    ) : (
+                                                        <>
+                                                            <button
+                                                                className="rounded border border-green-300 px-2 py-1 text-xs text-green-700"
+                                                                onClick={async () => {
+                                                                    if (!confirm(`Activate ${supplier.company_name}?`)) return;
+                                                                    try {
+                                                                        await axios.patch(`/api/suppliers/${supplier.id}/activate`);
+                                                                        fetchSuppliers();
+                                                                    } catch (err) {
+                                                                        console.error('Failed to activate supplier', err);
+                                                                    }
+                                                                }}
+                                                            >
+                                                                Activate
+                                                            </button>
+                                                            <span className="text-sm text-slate-500">Inactive</span>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -177,6 +216,7 @@ export default function SuppliersPage() {
                     )}
                 </div>
             </div>
+
         </AppLayout>
     );
 }

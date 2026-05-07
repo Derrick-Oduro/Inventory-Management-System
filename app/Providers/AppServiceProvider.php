@@ -16,5 +16,13 @@ class AppServiceProvider extends ServiceProvider
                 'user' => $user ? $user->toArray() : null,
             ];
         });
+
+        // Share application-level settings (like currency) with Inertia pages
+        Inertia::share('app', function () {
+            return [
+                'currency' => config('app.currency', 'GHS'),
+                'available_currencies' => config('app.available_currencies', ['GHS', 'USD']),
+            ];
+        });
     }
 }

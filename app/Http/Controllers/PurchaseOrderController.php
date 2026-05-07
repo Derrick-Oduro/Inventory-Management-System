@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\InventoryItem;
+use App\Models\Supplier;
 use App\Models\ItemStock;
 use App\Models\Location;
 use App\Models\PurchaseOrder;
@@ -71,13 +72,19 @@ class PurchaseOrderController extends Controller
     {
         $validated = $request->validate([
             'supplier_id' => 'required|exists:suppliers,id',
-            'expected_delivery_date' => 'nullable|date',
+            'expected_delivery_date' => 'required|date|after_or_equal:today',
             'notes' => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.item_id' => 'required|exists:inventory_items,id',
             'items.*.quantity' => 'required|numeric|min:0.01',
             'items.*.unit_price' => 'required|numeric|min:0',
         ]);
+
+        // Ensure selected supplier is active
+        $supplier = Supplier::find($validated['supplier_id']);
+        if (!$supplier || !$supplier->is_active) {
+            return response()->json(['message' => 'Selected supplier is not active.'], 422);
+        }
 
         $purchaseOrder = DB::transaction(function () use ($validated) {
             $po = PurchaseOrder::create([
@@ -128,13 +135,19 @@ class PurchaseOrderController extends Controller
 
         $validated = $request->validate([
             'supplier_id' => 'required|exists:suppliers,id',
-            'expected_delivery_date' => 'nullable|date',
+            'expected_delivery_date' => 'required|date|after_or_equal:today',
             'notes' => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.item_id' => 'required|exists:inventory_items,id',
             'items.*.quantity' => 'required|numeric|min:0.01',
             'items.*.unit_price' => 'required|numeric|min:0',
         ]);
+
+        // Ensure selected supplier is active when updating
+        $supplier = Supplier::find($validated['supplier_id']);
+        if (!$supplier || !$supplier->is_active) {
+            return response()->json(['message' => 'Selected supplier is not active.'], 422);
+        }
 
         DB::transaction(function () use ($purchaseOrder, $validated) {
             $purchaseOrder->update([

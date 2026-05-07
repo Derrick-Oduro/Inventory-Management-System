@@ -145,6 +145,30 @@ class SupplierController extends Controller
         return response()->json(['message' => 'Supplier deactivated successfully']);
     }
 
+    public function activate(int $id): JsonResponse
+    {
+        if (!$this->isManagerOrAdmin()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $supplier = Supplier::findOrFail($id);
+        $supplier->update([
+            'is_active' => true,
+            'updated_by' => Auth::id(),
+        ]);
+
+        AuditLog::log(
+            'SUPPLIER_ACTIVATE',
+            "Activated supplier: {$supplier->company_name}",
+            'Supplier',
+            $supplier->id,
+            ['is_active' => false],
+            ['is_active' => true]
+        );
+
+        return response()->json(['message' => 'Supplier activated successfully']);
+    }
+
     public function syncItems(Request $request, int $id): JsonResponse
     {
         if (!$this->isManagerOrAdmin()) {

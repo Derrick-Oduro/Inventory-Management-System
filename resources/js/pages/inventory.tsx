@@ -410,7 +410,7 @@ export default function Inventory() {
                 <StatCard
                     icon={<DollarSign className="h-5 w-5" />}
                     label="Total Value"
-                    value={`$${stats.totalValue.toLocaleString()}`}
+                    value={stats.totalValue.toLocaleString('en-GH', { style: 'currency', currency: 'GHS' })}
                     color="green"
                     isValue={true}
                 />
@@ -698,10 +698,10 @@ export default function Inventory() {
                                         <td className="px-3 py-2.5">
                                             <div className="text-xs text-slate-600">
                                                 <div>
-                                                    Cost: <span className="font-medium text-slate-900">${Number(item.cost_price ?? item.unit_price ?? 0).toFixed(2)}</span>
+                                                    Cost: <span className="font-medium text-slate-900">{Number(item.cost_price ?? item.unit_price ?? 0).toLocaleString('en-GH', { style: 'currency', currency: 'GHS' })}</span>
                                                 </div>
                                                 <div>
-                                                    Sell: <span className="font-medium text-slate-900">${Number(item.selling_price ?? item.unit_price ?? 0).toFixed(2)}</span>
+                                                    Sell: <span className="font-medium text-slate-900">{Number(item.selling_price ?? item.unit_price ?? 0).toLocaleString('en-GH', { style: 'currency', currency: 'GHS' })}</span>
                                                 </div>
                                             </div>
                                         </td>
