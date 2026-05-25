@@ -2,6 +2,8 @@
 
 set -e
 
+mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views bootstrap/cache
+
 if [ "${RUN_DATABASE_MIGRATIONS:-true}" = "true" ]; then
     attempts="${MIGRATION_RETRY_ATTEMPTS:-30}"
     attempt=1

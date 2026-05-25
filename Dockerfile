@@ -30,7 +30,8 @@ WORKDIR /var/www/html
 ENV APP_ENV=production \
     APP_DEBUG=false \
     COMPOSER_ALLOW_SUPERUSER=1 \
-    PORT=10000
+    PORT=10000 \
+    VIEW_COMPILED_PATH=/var/www/html/storage/framework/views
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -52,6 +53,8 @@ COPY --from=frontend /app/public/build ./public/build
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 
 RUN chmod +x /usr/local/bin/entrypoint.sh \
+    && mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views bootstrap/cache \
+    && chown -R www-data:www-data storage bootstrap/cache \
     && php artisan package:discover --ansi --no-interaction
 
 EXPOSE 10000
