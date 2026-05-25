@@ -1,46 +1,40 @@
 services:
-  # === Laravel Backend ===
   - type: web
-    name: laravel-backend
-    env: docker
-    plan: free
-    buildCommand: |
-      cd backend
-      composer install --no-dev --optimize-autoloader
-      php artisan key:generate
-      php artisan migrate --force
-    startCommand: php artisan serve --host 0.0.0.0 --port $PORT
+    name: it-support-system
+    runtime: docker
+    dockerfilePath: Dockerfile
+    healthCheckPath: /up
     envVars:
       - key: APP_ENV
         value: production
-      - key: APP_KEY
-        sync: false
       - key: APP_DEBUG
         value: false
+      - key: APP_KEY
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: SEED_ADMIN_EMAIL
+        sync: false
+      - key: SEED_ADMIN_NAME
+        sync: false
+      - key: SEED_ADMIN_PASSWORD
+        sync: false
       - key: DB_CONNECTION
-        value: mysql
-      - key: DB_HOST
-        value: your-db-host
-      - key: DB_PORT
-        value: 3306
-      - key: DB_DATABASE
-        value: your-db
-      - key: DB_USERNAME
-        value: your-user
-      - key: DB_PASSWORD
-        value: your-password
-      - key: FRONTEND_URL
-        value: https://inventory-management-system.onrender.com
+        value: pgsql
+      - key: DATABASE_URL
+        fromDatabase:
+          name: it-support-system-db
+          property: connectionString
+      - key: SESSION_DRIVER
+        value: database
+      - key: CACHE_STORE
+        value: database
+      - key: QUEUE_CONNECTION
+        value: database
+      - key: RUN_DATABASE_MIGRATIONS
+        value: true
 
-  # === React Frontend ===
-  - type: web
-    name: react-frontend
-    env: static
-    buildCommand: |
-      cd frontend
-      npm install
-      npm run build
-    staticPublishPath: frontend/build
-    envVars:
-      - key: REACT_APP_API_URL
-        value: https://your-backend.onrender.com/api
+databases:
+  - name: it-support-system-db
+    databaseName: it_support_system
+    user: it_support_system
