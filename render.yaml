@@ -12,7 +12,9 @@ services:
       - key: APP_KEY
         sync: false
       - key: APP_URL
-        sync: false
+        value: https://ims-b8y2.onrender.com
+      - key: ASSET_URL
+        value: https://ims-b8y2.onrender.com
       - key: SEED_ADMIN_EMAIL
         sync: false
       - key: SEED_ADMIN_NAME
