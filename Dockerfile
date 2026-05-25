@@ -1,6 +1,14 @@
-FROM composer:2 AS vendor
+FROM php:8.4-cli-bookworm AS vendor
 
 WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        curl \
+        git \
+        unzip \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-interaction --no-progress --prefer-dist --optimize-autoloader --no-scripts
@@ -15,7 +23,7 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM php:8.3-cli-bookworm AS app
+FROM php:8.4-cli-bookworm AS app
 
 WORKDIR /var/www/html
 
@@ -37,7 +45,7 @@ RUN apt-get update \
     && docker-php-ext-install pdo_pgsql mbstring zip intl bcmath pcntl opcache \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+COPY --from=vendor /usr/local/bin/composer /usr/local/bin/composer
 COPY --from=vendor /app/vendor ./vendor
 COPY . .
 COPY --from=frontend /app/public/build ./public/build
